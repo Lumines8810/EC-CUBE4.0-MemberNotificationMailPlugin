@@ -18,7 +18,11 @@ class Twig_Loader_Filesystem
         foreach ($this->paths as $path) {
             $fullPath = rtrim($path, '/').'/'.$name;
             if (file_exists($fullPath)) {
-                return file_get_contents($fullPath);
+                $content = file_get_contents($fullPath);
+                if ($content === false) {
+                    throw new \RuntimeException(sprintf('Failed to read template %s', $name));
+                }
+                return $content;
             }
         }
 
