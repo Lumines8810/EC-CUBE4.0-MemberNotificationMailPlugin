@@ -179,7 +179,7 @@ class PluginManager extends AbstractPluginManager
             $em->flush();
             $em->commit();
         } catch (Throwable $e) {
-            $em->rollback();
+            $em->getConnection()->rollback();
             throw $e;
         }
     }
