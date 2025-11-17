@@ -144,6 +144,11 @@ class PluginManager extends AbstractPluginManager
     /**
      * 旧バージョンで作成された MailTemplate の file_name を Twig の実パスへ移行する.
      *
+     * このメソッドは以下の動作を行います:
+     *   1. 既存のレガシーなテンプレート（旧 file_name）を新しい file_name へ更新します。
+     *   2. 新しい file_name で既に別のテンプレートが存在する場合は、その重複テンプレートを削除します。
+     *   3. この処理は冪等であり、複数回実行しても安全です。
+     *
      * @param EntityManagerInterface $em
      */
     protected function migrateMailTemplateFileNames(EntityManagerInterface $em): void
