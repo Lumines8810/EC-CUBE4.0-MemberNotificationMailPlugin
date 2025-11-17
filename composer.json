@@ -34,5 +34,10 @@
     },
     "extra": {
         "code": "CustomerChangeNotify"
+    },
+    "config": {
+        "allow-plugins": {
+            "ec-cube/plugin-installer": true
+        }
     }
 }
