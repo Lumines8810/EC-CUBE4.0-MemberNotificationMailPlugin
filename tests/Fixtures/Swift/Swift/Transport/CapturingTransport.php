@@ -5,7 +5,7 @@ class Swift_Transport_CapturingTransport extends Swift_Transport_AbstractTranspo
     /** @var array<int, Swift_Message> */
     private $messages = [];
 
-    public function send(Swift_Message $message, &$failedRecipients = null)
+    public function send(Swift_Message $message, &$failedRecipients = null): int
     {
         $this->messages[] = $message;
 
