@@ -74,12 +74,16 @@ class CustomerChangeSubscriber implements EventSubscriber
         $em = $args->getEntityManager();
         $uow = $em->getUnitOfWork();
 
-        // 念のため flush 開始時にキューを初期化して、別トランザクションの残りを持ち越さないようにする。
+        // If a previous flush aborted before postFlush ran, stale notifications
+        // could remain queued. Ensure each flush cycle starts with a clean slate
+        // so rolled-back changes are not delivered on a later successful flush.
         if (!empty($this->pendingNotifications)) {
-            $this->logger->debug('[CustomerChangeNotify] onFlush: 既存の通知キューをクリア', [
-                'cleared_count' => count($this->pendingNotifications),
-            ]);
+            $queueSize = count($this->pendingNotifications);
             $this->pendingNotifications = [];
+
+            $this->logger->debug('[CustomerChangeNotify] onFlush: 前回の flush で残った通知キューをリセット', [
+                'cleared_count' => $queueSize,
+            ]);
         }
 
         $request = $this->requestStack->getCurrentRequest();
