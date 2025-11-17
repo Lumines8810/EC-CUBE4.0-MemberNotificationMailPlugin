@@ -161,6 +161,7 @@ class PluginManager extends AbstractPluginManager
             $currentTemplate = $repo->findOneBy(['file_name' => $current]);
             if ($currentTemplate && $currentTemplate !== $legacyTemplate) {
                 $em->remove($currentTemplate);
+                $em->flush();
             }
 
             $legacyTemplate->setFileName($current);
