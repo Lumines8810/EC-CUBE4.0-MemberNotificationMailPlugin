@@ -176,36 +176,37 @@ bin/console eccube:plugin:uninstall --code=CustomerChangeNotify
 
 ```
 CustomerChangeNotify/
-├── Plugin.php                   # プラグインのエントリーポイント
-├── config.yml                   # プラグイン設定
-├── composer.json                # Composer 設定
-├── Event/
-│   └── CustomerChangeSubscriber.php  # Doctrine イベント監視
-├── Service/
-│   ├── NotificationService.php  # メール通知サービス
-│   └── DiffBuilder.php          # 差分検出サービス
+├── PluginManager.php            # インストール/アップデート処理とスキーマ管理
+├── Nav.php                      # 管理画面メニュー登録
+├── config.yml                   # プラグインメタ情報
+├── composer.json                # 依存定義
 ├── Controller/
-│   └── Admin/
-│       └── ConfigController.php # 管理画面設定コントローラー
-├── Form/
-│   └── Type/
-│       └── ConfigType.php       # 設定フォーム
+│   └── Admin/ConfigController.php   # 設定画面コントローラ
 ├── Entity/
 │   └── Config.php               # 設定エンティティ
+├── Repository/
+│   └── ConfigRepository.php     # 設定取得ロジック
+├── Form/
+│   └── Type/ConfigType.php      # 設定フォーム
+├── Service/
+│   ├── NotificationService.php  # メール通知処理
+│   └── DiffBuilder.php          # 差分生成ロジック
+├── Event/
+│   └── CustomerChangeSubscriber.php # Doctrine イベント購読
 ├── Resource/
-│   ├── config/
-│   │   └── services.yaml        # サービス定義
+│   ├── config/services.yaml     # サービス定義
 │   └── template/
-│       ├── admin/
-│       │   └── config.twig      # 管理画面テンプレート
+│       ├── admin/config.twig    # 管理画面テンプレート
 │       └── Mail/
-│           ├── customer_change_admin_mail.twig   # 管理者向けメール
-│           └── customer_change_member_mail.twig  # 会員向けメール
-└── tests/
-    └── Service/
-        ├── DiffBuilderTest.php  # ユニットテスト
-        ├── NotificationServiceTest.php
-        └── ...
+│           ├── customer_change_admin_mail.twig
+│           └── customer_change_member_mail.twig
+├── tests/
+│   ├── bootstrap.php
+│   ├── Event/CustomerChangeSubscriberTest.php
+│   └── Service/
+│       ├── DiffBuilderTest.php
+│       └── NotificationServiceTest.php
+└── Resource/template/Mail 他、補助ファイル
 ```
 
 ### テストの実行
