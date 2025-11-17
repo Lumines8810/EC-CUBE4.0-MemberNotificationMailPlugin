@@ -3,6 +3,7 @@
 namespace Plugin\CustomerChangeNotify\Event;
 
 use Doctrine\Common\EventSubscriber;
+use Doctrine\ORM\Event\OnClearEventArgs;
 use Doctrine\ORM\Event\OnFlushEventArgs;
 use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Events;
@@ -57,6 +58,7 @@ class CustomerChangeSubscriber implements EventSubscriber
     public function getSubscribedEvents()
     {
         return [
+            Events::onClear,
             Events::onFlush,
             Events::postFlush,
         ];
@@ -71,6 +73,14 @@ class CustomerChangeSubscriber implements EventSubscriber
     {
         $em = $args->getEntityManager();
         $uow = $em->getUnitOfWork();
+
+        // 念のため flush 開始時にキューを初期化して、別トランザクションの残りを持ち越さないようにする。
+        if (!empty($this->pendingNotifications)) {
+            $this->logger->debug('[CustomerChangeNotify] onFlush: 既存の通知キューをクリア', [
+                'cleared_count' => count($this->pendingNotifications),
+            ]);
+            $this->pendingNotifications = [];
+        }
 
         $request = $this->requestStack->getCurrentRequest();
 
@@ -148,5 +158,22 @@ class CustomerChangeSubscriber implements EventSubscriber
                 'cleared_count' => $queueSize,
             ]);
         }
+    }
+
+    /**
+     * clear イベントで通知キューをリセットする.
+     */
+    public function onClear(OnClearEventArgs $args): void
+    {
+        if (empty($this->pendingNotifications)) {
+            return;
+        }
+
+        $queueSize = count($this->pendingNotifications);
+        $this->pendingNotifications = [];
+
+        $this->logger->debug('[CustomerChangeNotify] onClear: 通知キューをリセット', [
+            'cleared_count' => $queueSize,
+        ]);
     }
 }
