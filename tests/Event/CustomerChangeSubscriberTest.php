@@ -151,4 +151,76 @@ class CustomerChangeSubscriberTest extends TestCase
 
         $this->subscriber->postFlush($postFlushArgs);
     }
+
+    public function testMultipleFlushesNotifyAllDetectedChanges(): void
+    {
+        $customer1 = $this->createMock(\Eccube\Entity\Customer::class);
+        $customer1->method('getId')->willReturn(1);
+        $customer1->method('getEmail')->willReturn('first@example.com');
+
+        $customer2 = $this->createMock(\Eccube\Entity\Customer::class);
+        $customer2->method('getId')->willReturn(2);
+        $customer2->method('getEmail')->willReturn('second@example.com');
+
+        $diff1 = new Diff();
+        $diff1->addChange('email', 'メールアドレス', 'old1@example.com', 'new1@example.com', 'old1@example.com', 'new1@example.com');
+
+        $diff2 = new Diff();
+        $diff2->addChange('email', 'メールアドレス', 'old2@example.com', 'new2@example.com', 'old2@example.com', 'new2@example.com');
+
+        $this->notificationService
+            ->method('buildDiff')
+            ->willReturnOnConsecutiveCalls($diff1, $diff2);
+
+        $expectedNotifyArgs = [
+            [$customer1, $diff1],
+            [$customer2, $diff2],
+        ];
+        $callIndex = 0;
+        $this->notificationService
+            ->expects($this->exactly(2))
+            ->method('notify')
+            ->with(
+                $this->callback(function ($customer) use (&$callIndex, $expectedNotifyArgs) {
+                    return $customer === $expectedNotifyArgs[$callIndex][0];
+                }),
+                $this->callback(function ($diff) use (&$callIndex, $expectedNotifyArgs) {
+                    return $diff === $expectedNotifyArgs[$callIndex][1];
+                }),
+                $this->anything()
+            )
+            ->willReturnCallback(function () use (&$callIndex) {
+                $callIndex++;
+            });
+
+        $this->requestStack
+            ->method('getCurrentRequest')
+            ->willReturn(null);
+
+        // 1 回目の flush
+        $em1 = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
+        $uow1 = $this->createMock(\Doctrine\ORM\UnitOfWork::class);
+        $em1->method('getUnitOfWork')->willReturn($uow1);
+        $uow1->method('getScheduledEntityUpdates')->willReturn([$customer1]);
+        $uow1->method('getEntityChangeSet')->willReturn(['email' => ['old1@example.com', 'new1@example.com']]);
+
+        $onFlushArgs1 = $this->createMock(\Doctrine\ORM\Event\OnFlushEventArgs::class);
+        $onFlushArgs1->method('getEntityManager')->willReturn($em1);
+
+        $this->subscriber->onFlush($onFlushArgs1);
+        $this->subscriber->postFlush($this->createMock(\Doctrine\ORM\Event\PostFlushEventArgs::class));
+
+        // 2 回目の flush（同一リクエスト内）
+        $em2 = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
+        $uow2 = $this->createMock(\Doctrine\ORM\UnitOfWork::class);
+        $em2->method('getUnitOfWork')->willReturn($uow2);
+        $uow2->method('getScheduledEntityUpdates')->willReturn([$customer2]);
+        $uow2->method('getEntityChangeSet')->willReturn(['email' => ['old2@example.com', 'new2@example.com']]);
+
+        $onFlushArgs2 = $this->createMock(\Doctrine\ORM\Event\OnFlushEventArgs::class);
+        $onFlushArgs2->method('getEntityManager')->willReturn($em2);
+
+        $this->subscriber->onFlush($onFlushArgs2);
+        $this->subscriber->postFlush($this->createMock(\Doctrine\ORM\Event\PostFlushEventArgs::class));
+    }
 }

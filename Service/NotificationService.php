@@ -11,6 +11,7 @@ use Psr\Log\LoggerInterface;
 use Swift_Mailer;
 use Swift_Message;
 use Symfony\Component\HttpFoundation\Request;
+use Twig\Environment;
 
 /**
  * 会員情報変更の差分を元に、管理者・会員へメール通知を行うサービス.
@@ -23,7 +24,7 @@ class NotificationService
     private $mailer;
 
     /**
-     * @var \Twig_Environment
+     * @var Environment
      */
     private $twig;
 
@@ -49,7 +50,7 @@ class NotificationService
 
     /**
      * @param Swift_Mailer        $mailer
-     * @param \Twig_Environment   $twig
+     * @param Environment          $twig
      * @param BaseInfoRepository  $baseInfoRepository
      * @param ConfigRepository    $configRepository
      * @param DiffBuilder         $diffBuilder
@@ -57,7 +58,7 @@ class NotificationService
      */
     public function __construct(
         Swift_Mailer $mailer,
-        \Twig_Environment $twig,
+        Environment $twig,
         BaseInfoRepository $baseInfoRepository,
         ConfigRepository $configRepository,
         DiffBuilder $diffBuilder,
