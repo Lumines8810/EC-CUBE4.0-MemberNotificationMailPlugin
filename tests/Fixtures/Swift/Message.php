@@ -22,9 +22,12 @@ class Swift_Message
         return $this;
     }
 
-    public function setTo(array $to)
+    /**
+     * @param string|array $to
+     */
+    public function setTo($to)
     {
-        $this->to = $to;
+        $this->to = is_array($to) ? $to : [$to];
 
         return $this;
     }
