@@ -22,7 +22,7 @@ class PluginManager extends AbstractPluginManager
 
     /** @var array<string, string> 旧テンプレートパスのマッピング */
     private const LEGACY_TEMPLATE_FILE_MAP = [
-        'CustomerChangeNotify/admin'  => self::ADMIN_TEMPLATE_FILE,
+        'CustomerChangeNotify/admin' => self::ADMIN_TEMPLATE_FILE,
         'CustomerChangeNotify/member' => self::MEMBER_TEMPLATE_FILE,
     ];
 
@@ -156,7 +156,7 @@ class PluginManager extends AbstractPluginManager
     {
         $repo = $em->getRepository(MailTemplate::class);
 
-        $em->getConnection()->beginTransaction();
+        $em->beginTransaction();
 
         try {
             foreach (self::LEGACY_TEMPLATE_FILE_MAP as $legacy => $current) {
@@ -169,19 +169,17 @@ class PluginManager extends AbstractPluginManager
                 /** @var MailTemplate|null $currentTemplate */
                 $currentTemplate = $repo->findOneBy(['file_name' => $current]);
                 if ($currentTemplate && $currentTemplate !== $legacyTemplate) {
-                    // 既に新パスで別のテンプレートがある場合は重複を削除
                     $em->remove($currentTemplate);
                 }
 
-                // 旧テンプレの file_name を新しいパスに変更
                 $legacyTemplate->setFileName($current);
                 $em->persist($legacyTemplate);
             }
 
             $em->flush();
-            $em->getConnection()->commit();
+            $em->commit();
         } catch (Throwable $e) {
-            $em->getConnection()->rollBack();
+            $em->getConnection()->rollback();
             throw $e;
         }
     }
@@ -193,7 +191,7 @@ class PluginManager extends AbstractPluginManager
      */
     protected function createConfigTable(EntityManagerInterface $em): void
     {
-        $metadata   = $em->getClassMetadata(Config::class);
+        $metadata = $em->getClassMetadata(Config::class);
         $schemaTool = new SchemaTool($em);
 
         try {
@@ -211,7 +209,7 @@ class PluginManager extends AbstractPluginManager
      */
     protected function dropConfigTable(EntityManagerInterface $em): void
     {
-        $metadata   = $em->getClassMetadata(Config::class);
+        $metadata = $em->getClassMetadata(Config::class);
         $schemaTool = new SchemaTool($em);
 
         try {
