@@ -154,6 +154,7 @@ class PluginManager extends AbstractPluginManager
     protected function migrateMailTemplateFileNames(EntityManagerInterface $em): void
     {
         $repo = $em->getRepository(MailTemplate::class);
+        $needsFlush = false;
 
         foreach (self::LEGACY_TEMPLATE_FILE_MAP as $legacy => $current) {
             /** @var MailTemplate|null $legacyTemplate */
@@ -162,16 +163,21 @@ class PluginManager extends AbstractPluginManager
                 continue;
             }
 
+            $needsFlush = true;
+
             /** @var MailTemplate|null $currentTemplate */
             $currentTemplate = $repo->findOneBy(['file_name' => $current]);
             if ($currentTemplate && $currentTemplate !== $legacyTemplate) {
                 $em->remove($currentTemplate);
-                $em->flush();
-                $em->flush();
             }
 
             $legacyTemplate->setFileName($current);
             $em->persist($legacyTemplate);
+        }
+
+        if ($needsFlush) {
+            // Removing duplicates and renaming can be flushed together; the previous double flush here was unnecessary.
+            $em->flush();
         }
     }
 
