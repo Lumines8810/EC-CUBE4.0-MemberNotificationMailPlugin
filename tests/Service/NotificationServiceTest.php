@@ -3,187 +3,134 @@
 namespace Plugin\CustomerChangeNotify\Tests\Service;
 
 use PHPUnit\Framework\TestCase;
-use Plugin\CustomerChangeNotify\Repository\ConfigRepository;
-use Plugin\CustomerChangeNotify\Service\NotificationService;
-use Plugin\CustomerChangeNotify\Service\DiffBuilder;
+use Plugin\CustomerChangeNotify\Entity\Config;
 use Plugin\CustomerChangeNotify\Service\Diff;
-use Psr\Log\LoggerInterface;
+use Plugin\CustomerChangeNotify\Service\DiffBuilder;
+use Plugin\CustomerChangeNotify\Service\NotificationService;
+use Plugin\CustomerChangeNotify\Tests\Fixtures\Logger\ArrayLogger;
+use Plugin\CustomerChangeNotify\Tests\Fixtures\Repository\BaseInfoRepositoryStub;
+use Plugin\CustomerChangeNotify\Tests\Fixtures\Repository\ConfigRepositoryStub;
+use Swift_Mailer;
+use Swift_Message;
+use Swift_Transport_CapturingTransport;
+use Twig_Environment;
+use Twig_Loader_Filesystem;
+use Eccube\Entity\BaseInfo;
+use Eccube\Entity\Customer;
+use Symfony\Component\HttpFoundation\Request;
 
 require_once __DIR__ . '/../../Service/NotificationService.php';
 require_once __DIR__ . '/../../Service/DiffBuilder.php';
+require_once __DIR__ . '/../../Service/Diff.php';
 
-/**
- * NotificationService のユニットテスト.
- *
- * 注: このテストは基本的な構造を提供します。
- * EC-CUBE の完全な環境が必要な統合テストは別途作成してください。
- */
 class NotificationServiceTest extends TestCase
 {
-    /**
-     * @var \Swift_Mailer|\PHPUnit\Framework\MockObject\MockObject
-     */
-    private $mailer;
-
-    /**
-     * @var \Twig_Environment|\PHPUnit\Framework\MockObject\MockObject
-     */
-    private $twig;
-
-    /**
-     * @var \Eccube\Repository\BaseInfoRepository|\PHPUnit\Framework\MockObject\MockObject
-     */
-    private $baseInfoRepository;
-
-    /**
-     * @var ConfigRepository|\PHPUnit\Framework\MockObject\MockObject
-     */
-    private $configRepository;
-
-    /**
-     * @var DiffBuilder|\PHPUnit\Framework\MockObject\MockObject
-     */
-    private $diffBuilder;
-
-    /**
-     * @var LoggerInterface|\PHPUnit\Framework\MockObject\MockObject
-     */
-    private $logger;
-
-    /**
-     * @var NotificationService
-     */
+    /** @var NotificationService */
     private $service;
+
+    /** @var Swift_Transport_CapturingTransport */
+    private $transport;
+
+    /** @var ArrayLogger */
+    private $logger;
 
     protected function setUp(): void
     {
-        parent::setUp();
+        $baseInfo = new BaseInfo();
+        $baseInfo->setEmail01('shop@example.com');
+        $baseInfo->setShopName('テストショップ');
 
-        // Mock オブジェクトの作成
-        $this->mailer = $this->createMock(\Swift_Mailer::class);
-        $this->twig = $this->createMock(\Twig_Environment::class);
-        $this->baseInfoRepository = $this->createMock(\Eccube\Repository\BaseInfoRepository::class);
-        $this->configRepository = $this->createMock(ConfigRepository::class);
-        $this->diffBuilder = $this->createMock(DiffBuilder::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $config = new Config();
+        $config->setAdminTo('admin@example.com');
+        $config->setAdminSubject('管理者向け件名');
+        $config->setMemberSubject('会員向け件名');
 
-        // NotificationService のインスタンス作成
+        $this->transport = new Swift_Transport_CapturingTransport();
+        $mailer = new Swift_Mailer($this->transport);
+
+        $loader = new Twig_Loader_Filesystem([__DIR__ . '/../../Resource/template']);
+        $twig = new Twig_Environment($loader);
+
+        $diffBuilder = new DiffBuilder(['email', 'name01', 'name02']);
+        $this->logger = new ArrayLogger();
+
         $this->service = new NotificationService(
-            $this->mailer,
-            $this->twig,
-            $this->baseInfoRepository,
-            $this->configRepository,
-            $this->diffBuilder,
+            $mailer,
+            $twig,
+            new BaseInfoRepositoryStub($baseInfo),
+            new ConfigRepositoryStub($config),
+            $diffBuilder,
             $this->logger
         );
     }
 
-    /**
-     * buildDiff メソッドが DiffBuilder に委譲することを確認.
-     */
-    public function testBuildDiffDelegatesToDiffBuilder(): void
+    public function testNotifyRendersTwigTemplatesAndSendsMail(): void
     {
-        $customer = $this->createMock(\Eccube\Entity\Customer::class);
-        $customer->method('getId')->willReturn(123);
-        $customer->method('getEmail')->willReturn('test@example.com');
-
-        $changeSet = ['email' => ['old@example.com', 'new@example.com']];
-        $diff = new Diff();
-        $diff->addChange('email', 'メールアドレス', 'old@example.com', 'new@example.com', 'old@example.com', 'new@example.com');
-
-        $this->diffBuilder
-            ->expects($this->once())
-            ->method('build')
-            ->with($customer, $changeSet)
-            ->willReturn($diff);
-
-        // ログ記録の確認
-        $this->logger
-            ->expects($this->once())
-            ->method('info')
-            ->with(
-                $this->equalTo('[CustomerChangeNotify] 会員情報の変更を検知'),
-                $this->arrayHasKey('customer_id')
-            );
-
-        $result = $this->service->buildDiff($customer, $changeSet);
-
-        $this->assertSame($diff, $result);
-        $this->assertFalse($result->isEmpty());
-    }
-
-    /**
-     * buildDiff で差分が空の場合、ログが記録されないことを確認.
-     */
-    public function testBuildDiffWithEmptyDiffDoesNotLog(): void
-    {
-        $customer = $this->createMock(\Eccube\Entity\Customer::class);
-        $changeSet = [];
-        $emptyDiff = new Diff();
-
-        $this->diffBuilder
-            ->expects($this->once())
-            ->method('build')
-            ->with($customer, $changeSet)
-            ->willReturn($emptyDiff);
-
-        // ログが記録されないことを確認
-        $this->logger
-            ->expects($this->never())
-            ->method('info');
-
-        $result = $this->service->buildDiff($customer, $changeSet);
-
-        $this->assertTrue($result->isEmpty());
-    }
-
-    /**
-     * notify メソッドが空の差分で何もしないことを確認.
-     */
-    public function testNotifyWithEmptyDiffDoesNothing(): void
-    {
-        $customer = $this->createMock(\Eccube\Entity\Customer::class);
-        $emptyDiff = new Diff();
-
-        // メール送信が呼ばれないことを確認
-        $this->mailer
-            ->expects($this->never())
-            ->method('send');
-
-        $this->service->notify($customer, $emptyDiff);
-    }
-
-    /**
-     * notify メソッドのエラーハンドリングを確認.
-     *
-     * 注: 完全なテストには EC-CUBE の BaseInfo エンティティのモックが必要です。
-     * このテストは基本的な構造を示すものです。
-     */
-    public function testNotifyHandlesExceptionsGracefully(): void
-    {
-        $customer = $this->createMock(\Eccube\Entity\Customer::class);
-        $customer->method('getId')->willReturn(456);
-        $customer->method('getEmail')->willReturn('customer@example.com');
+        $customer = new Customer();
+        $customer->setId(99);
+        $customer->setEmail('member@example.com');
+        $customer->setName01('山田');
+        $customer->setName02('太郎');
 
         $diff = new Diff();
-        $diff->addChange('email', 'メールアドレス', 'old@example.com', 'new@example.com', 'old@example.com', 'new@example.com');
+        $diff->addChange('email', 'メールアドレス', 'old@example.com', 'member@example.com', 'old@example.com', 'member@example.com');
 
-        // BaseInfoRepository がエラーをスローする場合
-        $this->baseInfoRepository
-            ->method('get')
-            ->willThrowException(new \RuntimeException('Database error'));
+        $this->service->notify($customer, $diff, new Request());
 
-        // エラーログが記録されることを確認
-        $this->logger
-            ->expects($this->atLeastOnce())
-            ->method('error')
-            ->with(
-                $this->stringContains('[CustomerChangeNotify]'),
-                $this->anything()
-            );
+        $messages = $this->transport->messages();
+        $this->assertCount(2, $messages);
 
-        // 例外が外部に伝播しないことを確認
+        /** @var Swift_Message $admin */
+        $admin = $messages[0];
+        /** @var Swift_Message $member */
+        $member = $messages[1];
+
+        $this->assertSame('管理者向け件名', $admin->getSubject());
+        $this->assertSame('会員向け件名', $member->getSubject());
+
+        $this->assertStringContainsString('山田 太郎 様の会員情報が変更されました。', $admin->getBody());
+        $this->assertStringContainsString('- メールアドレス:', $admin->getBody());
+        $this->assertStringContainsString('会員情報が変更されましたのでお知らせいたします。', $member->getBody());
+        $this->assertStringContainsString('- メールアドレス が変更されました。', $member->getBody());
+    }
+
+    public function testNotifySkipsEmptyDiff(): void
+    {
+        $customer = new Customer();
+        $customer->setId(1);
+        $customer->setEmail('nochange@example.com');
+
+        $diff = new Diff();
+
+        $this->service->notify($customer, $diff, null);
+
+        $this->assertEmpty($this->transport->messages());
+    }
+
+    public function testNotifyLogsErrorsFromMailer(): void
+    {
+        $customer = new Customer();
+        $customer->setId(2);
+        $customer->setEmail('member@example.com');
+
+        $diff = new Diff();
+        $diff->addChange('email', 'メールアドレス', 'old@example.com', 'member@example.com', 'old@example.com', 'member@example.com');
+
+        $throwingTransport = new class extends \Swift_Transport_AbstractTransport {
+            public function send(Swift_Message $message, &$failedRecipients = null)
+            {
+                throw new \RuntimeException('transport failed');
+            }
+        };
+
+        $ref = new \ReflectionProperty(NotificationService::class, 'mailer');
+        $ref->setAccessible(true);
+        $ref->setValue($this->service, new Swift_Mailer($throwingTransport));
+
         $this->service->notify($customer, $diff);
-        $this->assertTrue(true); // 例外がスローされなければテスト成功
+
+        $errors = $this->logger->filterByLevel('error');
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('メール送信エラー', $errors[0]['message']);
     }
 }
