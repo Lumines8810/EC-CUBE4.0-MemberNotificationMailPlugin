@@ -142,7 +142,6 @@ class TestMailTemplateRepository extends \Doctrine\ORM\EntityRepository
         foreach ($this->templates as $index => $item) {
             if ($item === $template) {
                 unset($this->templates[$index]);
-                $this->templates = array_values($this->templates);
 
                 return;
             }
