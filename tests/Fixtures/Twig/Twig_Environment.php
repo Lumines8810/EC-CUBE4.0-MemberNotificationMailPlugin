@@ -85,7 +85,12 @@ class Twig_Environment
         if ($value instanceof \DateTimeInterface) {
             return $value->format('Y-m-d H:i:s');
         }
-
-        return (string) $value;
+        if (is_object($value) && method_exists($value, '__toString')) {
+            return (string) $value;
+        }
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+        return '';
     }
 }
