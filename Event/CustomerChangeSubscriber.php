@@ -74,14 +74,6 @@ class CustomerChangeSubscriber implements EventSubscriber
         $em = $args->getEntityManager();
         $uow = $em->getUnitOfWork();
 
-        // 念のため flush 開始時にキューを初期化して、別トランザクションの残りを持ち越さないようにする。
-        if (!empty($this->pendingNotifications)) {
-            $this->logger->debug('[CustomerChangeNotify] onFlush: 既存の通知キューをクリア', [
-                'cleared_count' => count($this->pendingNotifications),
-            ]);
-            $this->pendingNotifications = [];
-        }
-
         $request = $this->requestStack->getCurrentRequest();
 
         foreach ($uow->getScheduledEntityUpdates() as $entity) {
