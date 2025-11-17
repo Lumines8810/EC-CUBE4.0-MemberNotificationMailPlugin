@@ -91,15 +91,17 @@ class CustomerChangeSubscriber implements EventSubscriber
      */
     public function postFlush(PostFlushEventArgs $args): void
     {
-        foreach ($this->pendingNotifications as $notification) {
-            $this->notificationService->notify(
-                $notification['customer'],
-                $notification['diff'],
-                $notification['request']
-            );
+        try {
+            foreach ($this->pendingNotifications as $notification) {
+                $this->notificationService->notify(
+                    $notification['customer'],
+                    $notification['diff'],
+                    $notification['request']
+                );
+            }
+        } finally {
+            // flush のたびにリセットする.
+            $this->pendingNotifications = [];
         }
-
-        // flush のたびにリセットする.
-        $this->pendingNotifications = [];
     }
 }
