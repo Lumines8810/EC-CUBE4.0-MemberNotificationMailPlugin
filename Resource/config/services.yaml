@@ -1,0 +1,22 @@
+services:
+  Plugin\CustomerChangeNotify\Event\CustomerChangeSubscriber:
+    class: Plugin\CustomerChangeNotify\Event\CustomerChangeSubscriber
+    arguments:
+      - '@Plugin\CustomerChangeNotify\Service\NotificationService'
+      - '@request_stack'
+    tags:
+      - { name: doctrine.event_subscriber, connection: default }
+
+  Plugin\CustomerChangeNotify\Service\DiffBuilder:
+    class: Plugin\CustomerChangeNotify\Service\DiffBuilder
+    arguments:
+      - ['name01', 'name02', 'kana01', 'kana02', 'email', 'tel01', 'tel02', 'tel03', 'zip01', 'zip02', 'addr01', 'addr02']
+
+  Plugin\CustomerChangeNotify\Service\NotificationService:
+    class: Plugin\CustomerChangeNotify\Service\NotificationService
+    arguments:
+      - '@mailer'
+      - '@twig'
+      - '@Eccube\Repository\BaseInfoRepository'
+      - '@Plugin\CustomerChangeNotify\Service\DiffBuilder'
+      - '%customer_change_notify.admin_to%'

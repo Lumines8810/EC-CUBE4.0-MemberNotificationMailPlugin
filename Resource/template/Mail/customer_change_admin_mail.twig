@@ -1,0 +1,17 @@
+{% set Customer = Customer %}
+{% set diff = diff %}
+
+{{ Customer.name01 }} {{ Customer.name02 }} 様の会員情報が変更されました。
+
+変更日時：{{ "now"|date("Y-m-d H:i:s") }}
+会員ID：{{ Customer.id }}
+メールアドレス：{{ Customer.email }}
+
+【変更内容】
+{% for field, change in diff %}
+- {{ field }}:
+    旧: {{ change.old }}
+    新: {{ change.new }}
+{% endfor %}
+
+※本メールはシステムから自動送信されています。

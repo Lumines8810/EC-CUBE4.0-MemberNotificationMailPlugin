@@ -1,0 +1,8 @@
+name: 会員情報変更通知プラグイン
+code: CustomerChangeNotify
+version: 1.0.0
+service:
+    customer_change_notify.admin_to: null   # null の場合は BaseInfo のメールに送信
+
+description: '会員情報が変更された際に、管理者・会員へメール通知するプラグインです。'
+eccube_version: 4.0.0

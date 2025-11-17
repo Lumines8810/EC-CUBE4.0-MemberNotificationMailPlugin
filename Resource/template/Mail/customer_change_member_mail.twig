@@ -1,0 +1,15 @@
+{% set Customer = Customer %}
+{% set diff = diff %}
+
+{{ Customer.name01 }} {{ Customer.name02 }} 様
+
+会員情報が変更されましたのでお知らせいたします。
+
+【変更内容】
+{% for field, change in diff %}
+- {{ field }} が変更されました。
+{% endfor %}
+
+もしお心当たりがない場合は、至急ショップまでご連絡ください。
+
+※本メールはシステムから自動送信されています。
