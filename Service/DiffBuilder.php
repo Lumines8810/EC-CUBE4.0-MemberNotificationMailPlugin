@@ -129,7 +129,11 @@ class DiffBuilder
         }
 
         if (is_array($value)) {
-            return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $encoded = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($encoded === false) {
+                return '[encoding error]';
+            }
+            return $encoded;
         }
 
         if ($value === null) {
