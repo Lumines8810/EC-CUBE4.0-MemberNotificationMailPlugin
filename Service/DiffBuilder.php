@@ -69,11 +69,14 @@ class DiffBuilder
 
             list($old, $new) = $value;
 
+            $normalizedOld = $this->normalize($old);
+            $normalizedNew = $this->normalize($new);
+
             if (!in_array($field, $this->watchFields, true)) {
                 continue;
             }
 
-            if ($old == $new) {
+            if ($normalizedOld === $normalizedNew) {
                 continue;
             }
 
@@ -81,5 +84,25 @@ class DiffBuilder
         }
 
         return $diff;
+    }
+
+    /**
+     * 差分判定用に値を正規化する.
+     *
+     * @param mixed $value
+     *
+     * @return mixed
+     */
+    private function normalize($value)
+    {
+        if (is_string($value)) {
+            return trim($value);
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format(\DateTime::ATOM);
+        }
+
+        return $value;
     }
 }
