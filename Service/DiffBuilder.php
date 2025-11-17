@@ -136,6 +136,9 @@ class DiffBuilder
             return '';
         }
 
+        if (is_object($value)) {
+            return method_exists($value, '__toString') ? (string) $value : get_class($value);
+        }
         return (string) $value;
     }
 }
