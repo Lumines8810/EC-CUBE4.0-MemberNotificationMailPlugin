@@ -102,7 +102,7 @@ class NotificationServiceTest extends TestCase
 
         $diff = new Diff();
 
-        $this->service->notify($customer, $diff);
+        $this->service->notify($customer, $diff, null);
 
         $this->assertEmpty($this->transport->messages());
     }
