@@ -13,7 +13,7 @@ class Twig_Environment
     public function render(string $name, array $context = []): string
     {
         $template = $this->loader->getSource($name);
-        $template = preg_replace('/{\%\s*set[^%]+%}\n?/m', '', $template);
+        $template = preg_replace('/{%\s*set[^%]+%}\n?/m', '', $template);
 
         $template = preg_replace_callback('/{\%\s*for\s+(\w+),\s*(\w+)\s+in\s+(\w+)\s*%\}(.*?){\%\s*endfor\s*%}/s', function ($matches) use ($context) {
             $keyVar = $matches[1];
