@@ -7,6 +7,7 @@ use Eccube\Entity\MailTemplate;
 use Eccube\Plugin\AbstractPluginManager;
 use Plugin\CustomerChangeNotify\Entity\Config;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Throwable;
 
 /**
  * 会員情報変更通知プラグイン
@@ -155,23 +156,31 @@ class PluginManager extends AbstractPluginManager
     {
         $repo = $em->getRepository(MailTemplate::class);
 
-        foreach (self::LEGACY_TEMPLATE_FILE_MAP as $legacy => $current) {
-            /** @var MailTemplate|null $legacyTemplate */
-            $legacyTemplate = $repo->findOneBy(['file_name' => $legacy]);
-            if (!$legacyTemplate) {
-                continue;
+        $em->beginTransaction();
+
+        try {
+            foreach (self::LEGACY_TEMPLATE_FILE_MAP as $legacy => $current) {
+                /** @var MailTemplate|null $legacyTemplate */
+                $legacyTemplate = $repo->findOneBy(['file_name' => $legacy]);
+                if (!$legacyTemplate) {
+                    continue;
+                }
+
+                /** @var MailTemplate|null $currentTemplate */
+                $currentTemplate = $repo->findOneBy(['file_name' => $current]);
+                if ($currentTemplate && $currentTemplate !== $legacyTemplate) {
+                    $em->remove($currentTemplate);
+                }
+
+                $legacyTemplate->setFileName($current);
+                $em->persist($legacyTemplate);
             }
 
-            /** @var MailTemplate|null $currentTemplate */
-            $currentTemplate = $repo->findOneBy(['file_name' => $current]);
-            if ($currentTemplate && $currentTemplate !== $legacyTemplate) {
-                $em->remove($currentTemplate);
-                $em->flush();
-                $em->flush();
-            }
-
-            $legacyTemplate->setFileName($current);
-            $em->persist($legacyTemplate);
+            $em->flush();
+            $em->commit();
+        } catch (Throwable $e) {
+            $em->rollback();
+            throw $e;
         }
     }
 
