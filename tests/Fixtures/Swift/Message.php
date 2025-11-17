@@ -12,9 +12,12 @@ class Swift_Message
         $this->subject = $subject;
     }
 
-    public function setFrom(array $from)
+    /**
+     * @param string|array $from
+     */
+    public function setFrom($from)
     {
-        $this->from = $from;
+        $this->from = is_array($from) ? $from : [$from];
 
         return $this;
     }
