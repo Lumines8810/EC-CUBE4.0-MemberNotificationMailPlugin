@@ -69,13 +69,12 @@ class DiffBuilder
 
             list($old, $new) = $value;
 
-            $normalizedOld = $this->normalize($old);
-            $normalizedNew = $this->normalize($new);
-
             if (!in_array($field, $this->watchFields, true)) {
                 continue;
             }
 
+            $normalizedOld = $this->normalize($old);
+            $normalizedNew = $this->normalize($new);
             if ($normalizedOld === $normalizedNew) {
                 continue;
             }
