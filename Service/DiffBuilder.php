@@ -173,7 +173,7 @@ class DiffBuilder
     private function normalize($value)
     {
         if (is_string($value)) {
-            return trim($value);
+            return preg_replace('/^[\s\x{3000}]+|[\s\x{3000}]+$/u', '', $value) ?? $value;
         }
 
         if ($value instanceof \DateTimeInterface) {

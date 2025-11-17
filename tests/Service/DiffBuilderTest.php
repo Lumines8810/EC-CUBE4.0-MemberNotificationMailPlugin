@@ -46,6 +46,16 @@ class DiffBuilderTest extends TestCase
         $this->assertTrue($diff->isEmpty());
     }
 
+    public function testTrimsMultibyteSpacesBeforeComparison(): void
+    {
+        $builder = new DiffBuilder(['name']);
+        $diff = $builder->build(new \Eccube\Entity\Customer(), [
+            'name' => ['Alice', "　Alice　"],
+        ]);
+
+        $this->assertTrue($diff->isEmpty());
+    }
+
     public function testNormalizesDateTimeForComparison(): void
     {
         $builder = new DiffBuilder(['last_login']);
