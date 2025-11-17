@@ -4,6 +4,7 @@ namespace Plugin\CustomerChangeNotify\Event;
 
 use Doctrine\Common\EventSubscriber;
 use Doctrine\ORM\Event\OnFlushEventArgs;
+use Doctrine\ORM\Event\PostFlushEventArgs;
 use Doctrine\ORM\Events;
 use Eccube\Entity\Customer;
 use Plugin\CustomerChangeNotify\Service\NotificationService;
@@ -25,6 +26,11 @@ class CustomerChangeSubscriber implements EventSubscriber
     private $requestStack;
 
     /**
+     * @var array<int, array{customer: Customer, diff: \Plugin\CustomerChangeNotify\Service\Diff, request: ?\Symfony\Component\HttpFoundation\Request}>
+     */
+    private $pendingNotifications = [];
+
+    /**
      * @param NotificationService $notificationService
      * @param RequestStack        $requestStack
      */
@@ -41,6 +47,7 @@ class CustomerChangeSubscriber implements EventSubscriber
     {
         return [
             Events::onFlush,
+            Events::postFlush,
         ];
     }
 
@@ -70,8 +77,29 @@ class CustomerChangeSubscriber implements EventSubscriber
                 continue;
             }
 
-            // 通知実行（管理者・会員 両方のメール送信をこの中で行う）
-            $this->notificationService->notify($entity, $diff, $request);
+            // ここでは差分だけをキューに積み、トランザクション完了後に送信する.
+            $this->pendingNotifications[] = [
+                'customer' => $entity,
+                'diff'     => $diff,
+                'request'  => $request,
+            ];
         }
+    }
+
+    /**
+     * postFlush イベントでキューされた通知をまとめて送信する.
+     */
+    public function postFlush(PostFlushEventArgs $args): void
+    {
+        foreach ($this->pendingNotifications as $notification) {
+            $this->notificationService->notify(
+                $notification['customer'],
+                $notification['diff'],
+                $notification['request']
+            );
+        }
+
+        // flush のたびにリセットする.
+        $this->pendingNotifications = [];
     }
 }
