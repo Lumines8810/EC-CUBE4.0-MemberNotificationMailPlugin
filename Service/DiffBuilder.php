@@ -17,10 +17,10 @@ class Diff
     public function addChange(string $field, string $label, $old, $new, string $oldFormatted, string $newFormatted): void
     {
         $this->changes[$field] = [
-            'field' => $field,
-            'label' => $label,
-            'old' => $old,
-            'new' => $new,
+            'field'         => $field,
+            'label'         => $label,
+            'old'           => $old,
+            'new'           => $new,
             'old_formatted' => $oldFormatted,
             'new_formatted' => $newFormatted,
         ];
@@ -63,12 +63,12 @@ class DiffBuilder
             'name02' => '名',
             'kana01' => 'セイ',
             'kana02' => 'メイ',
-            'email' => 'メールアドレス',
-            'tel01' => '電話番号（市外局番）',
-            'tel02' => '電話番号（市内局番）',
-            'tel03' => '電話番号（加入者番号）',
-            'zip01' => '郵便番号（3桁）',
-            'zip02' => '郵便番号（4桁）',
+            'email'  => 'メールアドレス',
+            'tel01'  => '電話番号（市外局番）',
+            'tel02'  => '電話番号（市内局番）',
+            'tel03'  => '電話番号（加入者番号）',
+            'zip01'  => '郵便番号（3桁）',
+            'zip02'  => '郵便番号（4桁）',
             'addr01' => '住所1',
             'addr02' => '住所2',
         ];
@@ -96,7 +96,9 @@ class DiffBuilder
                 continue;
             }
 
-            if ($old == $new) {
+            $normalizedOld = $this->normalize($old);
+            $normalizedNew = $this->normalize($new);
+            if ($normalizedOld === $normalizedNew) {
                 continue;
             }
 
@@ -113,11 +115,25 @@ class DiffBuilder
         return $diff;
     }
 
+    /**
+     * フィールド名から表示用ラベルを取得する.
+     *
+     * @param string $field
+     *
+     * @return string
+     */
     private function getFieldLabel(string $field): string
     {
         return $this->fieldLabels[$field] ?? $field;
     }
 
+    /**
+     * メール表示用に値を整形する.
+     *
+     * @param mixed $value
+     *
+     * @return string
+     */
     private function formatValue($value): string
     {
         if ($value instanceof \DateTimeInterface) {
@@ -143,6 +159,27 @@ class DiffBuilder
         if (is_object($value)) {
             return method_exists($value, '__toString') ? (string) $value : get_class($value);
         }
+
         return (string) $value;
+    }
+
+    /**
+     * 差分判定用に値を正規化する.
+     *
+     * @param mixed $value
+     *
+     * @return mixed
+     */
+    private function normalize($value)
+    {
+        if (is_string($value)) {
+            return trim($value);
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format(\DateTime::ATOM);
+        }
+
+        return $value;
     }
 }
