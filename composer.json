@@ -12,6 +12,11 @@
     "require": {
         "ec-cube/plugin-installer": "~0.0.6 || ~2.0"
     },
+    "autoload": {
+        "psr-4": {
+            "Plugin\\CustomerChangeNotify\\": ""
+        }
+    },
     "extra": {
         "code": "CustomerChangeNotify"
     }
