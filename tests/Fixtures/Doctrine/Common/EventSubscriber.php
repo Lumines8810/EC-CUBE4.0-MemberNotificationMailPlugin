@@ -7,5 +7,5 @@ interface EventSubscriber
     /**
      * @return array<int, string>
      */
-    public function getSubscribedEvents();
+    public function getSubscribedEvents(): array;
 }
