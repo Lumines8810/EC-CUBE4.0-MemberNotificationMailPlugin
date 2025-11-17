@@ -34,19 +34,69 @@ The plugin uses a Doctrine event subscriber pattern with deferred notification:
 
 ## Testing
 
-Run tests using PHPUnit:
+### Prerequisites
+
+Before running tests, ensure the following are installed:
+
+- **PHP 7.4+**: Required for PHPUnit execution
+- **Composer**: Required to install PHPUnit and test dependencies
+
+### Setup and Execution
 
 ```bash
-php vendor/bin/phpunit tests/
+# Install test dependencies (first time only)
+composer install
+
+# Run all tests
+vendor/bin/phpunit
+
+# Run with coverage report
+vendor/bin/phpunit --coverage-html coverage/html
+
+# Run specific test file
+vendor/bin/phpunit tests/Service/NotificationServiceTest.php
 ```
 
-Test structure:
-- Unit tests are located in `tests/Service/`
-- Tests use class aliasing to stub EC-CUBE entities (see DiffBuilderTest.php:16)
-- Key test scenarios:
-  - Type strictness: Ensures numeric vs string differences are detected
-  - String normalization: Verifies whitespace trimming before comparison
-  - DateTime normalization: Checks equivalent timestamps are treated as unchanged
+### Test Structure
+
+- Unit tests are located in `tests/Service/` and `tests/Event/`
+- Test fixtures (mocks) are in `tests/Fixtures/` - these stub EC-CUBE and third-party dependencies
+- `tests/bootstrap.php` provides custom autoloader for fixtures
+- Tests are **completely standalone** - no EC-CUBE installation required
+
+### Test Coverage
+
+- `tests/Service/NotificationServiceTest.php` - Mail notification logic
+- `tests/Event/CustomerChangeSubscriberTest.php` - Event subscriber behavior
+- `tests/Service/DiffBuilderTest.php` - Change detection and normalization
+
+### Key Test Scenarios
+
+- Type strictness: Ensures numeric vs string differences are detected
+- String normalization: Verifies whitespace trimming before comparison
+- DateTime normalization: Checks equivalent timestamps are treated as unchanged
+- Error handling: Validates logging and exception handling
+
+### Troubleshooting Test Execution
+
+**Problem**: `vendor/bin/phpunit: No such file or directory`
+- **Cause**: Composer dependencies not installed
+- **Solution**: Run `composer install` in the plugin directory
+
+**Problem**: `php: command not found`
+- **Cause**: PHP not installed or not in PATH
+- **Solution**:
+  - macOS: `brew install php`
+  - Ubuntu/Debian: `sudo apt-get install php-cli php-xml php-mbstring`
+  - Windows: Download from [php.net](https://www.php.net/downloads.php)
+
+**Problem**: `composer: command not found`
+- **Cause**: Composer not installed
+- **Solution**: Install from [getcomposer.org](https://getcomposer.org/doc/00-intro.md)
+
+**Problem**: Tests fail with class not found errors
+- **Cause**: Autoloader not finding fixtures
+- **Solution**: Verify `tests/bootstrap.php` is properly configured and all fixture files exist in `tests/Fixtures/`
 
 ## Admin Configuration Interface
 

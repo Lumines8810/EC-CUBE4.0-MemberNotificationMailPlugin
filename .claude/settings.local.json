@@ -3,7 +3,9 @@
     "allow": [
       "WebFetch(domain:doc4.ec-cube.net)",
       "WebFetch(domain:github.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(vendor/bin/phpunit:*)",
+      "Bash(php --version:*)"
     ],
     "deny": [],
     "ask": []

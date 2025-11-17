@@ -21,7 +21,7 @@
             <directory suffix=".php">Entity</directory>
         </include>
         <exclude>
-            <file>Plugin.php</file>
+            <file>PluginManager.php</file>
         </exclude>
         <report>
             <html outputDirectory="coverage/html"/>

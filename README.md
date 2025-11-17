@@ -211,9 +211,67 @@ CustomerChangeNotify/
 
 ### テストの実行
 
+#### 前提条件
+
+プラグインのテストを実行するには、以下の環境が必要です。
+
+- **PHP 7.4 以上**
+- **Composer**
+
+#### セットアップ手順
+
+1. **PHP のインストール確認**
+
 ```bash
-vendor/bin/phpunit
+php --version
 ```
+
+PHP がインストールされていない場合は、以下を参考にインストールしてください。
+
+- macOS: `brew install php`
+- Ubuntu/Debian: `sudo apt-get install php-cli php-xml php-mbstring`
+- Windows: [PHP公式サイト](https://www.php.net/downloads.php)からダウンロード
+
+2. **Composer のインストール確認**
+
+```bash
+composer --version
+```
+
+Composer がインストールされていない場合は、[公式インストールガイド](https://getcomposer.org/doc/00-intro.md)を参照してください。
+
+3. **テスト依存関係のインストール**
+
+```bash
+# プラグインディレクトリに移動
+cd /path/to/CustomerChangeNotify
+
+# 依存パッケージをインストール
+composer install
+```
+
+4. **テストの実行**
+
+```bash
+# 全テストを実行
+vendor/bin/phpunit
+
+# カバレッジレポート付きで実行
+vendor/bin/phpunit --coverage-html coverage/html
+
+# 特定のテストのみ実行
+vendor/bin/phpunit tests/Service/NotificationServiceTest.php
+```
+
+#### テストの構成
+
+プラグインには以下のテストが含まれています。
+
+- `tests/Service/NotificationServiceTest.php` - メール通知機能のテスト
+- `tests/Event/CustomerChangeSubscriberTest.php` - イベント購読のテスト
+- `tests/Service/DiffBuilderTest.php` - 差分生成ロジックのテスト
+
+テストは独立して実行可能で、EC-CUBE 本体のインストールは不要です（モック/フィクスチャを使用）。
 
 ### 技術的な詳細
 
