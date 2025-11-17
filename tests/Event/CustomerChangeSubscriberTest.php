@@ -99,17 +99,39 @@ class CustomerChangeSubscriberTest extends TestCase
         $requestStack = new RequestStack();
         $requestStack->push(new Request());
 
-        $failingService = new class($logger) extends NotificationService {
-            public function __construct($logger)
+        $baseService = $this->createNotificationService($logger);
+
+        $failingService = new class($baseService) extends NotificationService {
+            public function __construct(NotificationService $baseService)
             {
-                // ダミー依存の注入
-                $this->mailer = new Swift_Mailer(new Swift_Transport_CapturingTransport());
-                $loader = new Twig_Loader_Filesystem([__DIR__ . '/../../Resource/template']);
-                $this->twig = new Twig_Environment($loader);
-                $this->baseInfoRepository = new BaseInfoRepositoryStub(new BaseInfo());
-                $this->configRepository = new ConfigRepositoryStub(new Config());
-                $this->diffBuilder = new DiffBuilder(['email']);
-                $this->logger = $logger;
+                $reflection = new \ReflectionClass(NotificationService::class);
+
+                $mailer = $reflection->getProperty('mailer');
+                $mailer->setAccessible(true);
+
+                $twig = $reflection->getProperty('twig');
+                $twig->setAccessible(true);
+
+                $baseInfoRepository = $reflection->getProperty('baseInfoRepository');
+                $baseInfoRepository->setAccessible(true);
+
+                $configRepository = $reflection->getProperty('configRepository');
+                $configRepository->setAccessible(true);
+
+                $diffBuilder = $reflection->getProperty('diffBuilder');
+                $diffBuilder->setAccessible(true);
+
+                $logger = $reflection->getProperty('logger');
+                $logger->setAccessible(true);
+
+                parent::__construct(
+                    $mailer->getValue($baseService),
+                    $twig->getValue($baseService),
+                    $baseInfoRepository->getValue($baseService),
+                    $configRepository->getValue($baseService),
+                    $diffBuilder->getValue($baseService),
+                    $logger->getValue($baseService)
+                );
             }
 
             public function notify(\Eccube\Entity\Customer $customer, Diff $diff, ?Request $request = null): void
