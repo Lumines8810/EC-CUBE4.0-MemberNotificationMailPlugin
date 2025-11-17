@@ -25,7 +25,14 @@ class DiffBuilderTest extends TestCase
         ]);
 
         $this->assertSame([
-            'age' => ['old' => 1, 'new' => '1'],
+            'age' => [
+                'field'         => 'age',
+                'label'         => 'age',
+                'old'           => 1,
+                'new'           => '1',
+                'old_formatted' => '1',
+                'new_formatted' => '1',
+            ],
         ], $diff->getChanges());
     }
 
@@ -59,7 +66,14 @@ class DiffBuilderTest extends TestCase
         ]);
 
         $this->assertSame([
-            'last_login' => ['old' => $old, 'new' => $updated],
+            'last_login' => [
+                'field'         => 'last_login',
+                'label'         => 'last_login',
+                'old'           => $old,
+                'new'           => $updated,
+                'old_formatted' => '2024-05-01 10:00:00',
+                'new_formatted' => '2024-05-01 10:00:01',
+            ],
         ], $changed->getChanges());
     }
 }
