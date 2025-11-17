@@ -12,9 +12,24 @@
     "require": {
         "ec-cube/plugin-installer": "~0.0.6 || ~2.0"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "twig/twig": "^1.44",
+        "swiftmailer/swiftmailer": "^6.3",
+        "symfony/http-foundation": "^5.4",
+        "doctrine/orm": "^2.14",
+        "doctrine/annotations": "^1.14",
+        "psr/log": "^1.1 || ^2.0 || ^3.0"
+    },
     "autoload": {
         "psr-4": {
             "Plugin\\CustomerChangeNotify\\": ""
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Plugin\\CustomerChangeNotify\\Tests\\Fixtures\\": "tests/Fixtures/",
+            "Eccube\\": "tests/Fixtures/Eccube/"
         }
     },
     "extra": {

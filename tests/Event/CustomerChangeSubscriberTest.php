@@ -3,152 +3,138 @@
 namespace Plugin\CustomerChangeNotify\Tests\Event;
 
 use PHPUnit\Framework\TestCase;
+use Plugin\CustomerChangeNotify\Entity\Config;
 use Plugin\CustomerChangeNotify\Event\CustomerChangeSubscriber;
-use Plugin\CustomerChangeNotify\Service\NotificationService;
 use Plugin\CustomerChangeNotify\Service\Diff;
-use Psr\Log\LoggerInterface;
-use Doctrine\ORM\Events;
+use Plugin\CustomerChangeNotify\Service\DiffBuilder;
+use Plugin\CustomerChangeNotify\Service\NotificationService;
+use Plugin\CustomerChangeNotify\Tests\Fixtures\Logger\ArrayLogger;
+use Plugin\CustomerChangeNotify\Tests\Fixtures\Repository\BaseInfoRepositoryStub;
+use Plugin\CustomerChangeNotify\Tests\Fixtures\Repository\ConfigRepositoryStub;
+use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\Event\OnFlushEventArgs;
+use Doctrine\ORM\Event\PostFlushEventArgs;
+use Eccube\Entity\BaseInfo;
+use Eccube\Entity\Customer;
+use Swift_Mailer;
+use Swift_Transport_CapturingTransport;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Twig_Environment;
+use Twig_Loader_Filesystem;
 
 require_once __DIR__ . '/../../Event/CustomerChangeSubscriber.php';
+require_once __DIR__ . '/../../Service/NotificationService.php';
 require_once __DIR__ . '/../../Service/DiffBuilder.php';
+require_once __DIR__ . '/../../Service/Diff.php';
 
-/**
- * CustomerChangeSubscriber のユニットテスト.
- *
- * 注: このテストは基本的な構造を提供します。
- * Doctrine の完全なモックが必要な統合テストは別途作成してください。
- */
 class CustomerChangeSubscriberTest extends TestCase
 {
-    /**
-     * @var NotificationService|\PHPUnit\Framework\MockObject\MockObject
-     */
-    private $notificationService;
-
-    /**
-     * @var \Symfony\Component\HttpFoundation\RequestStack|\PHPUnit\Framework\MockObject\MockObject
-     */
-    private $requestStack;
-
-    /**
-     * @var LoggerInterface|\PHPUnit\Framework\MockObject\MockObject
-     */
-    private $logger;
-
-    /**
-     * @var CustomerChangeSubscriber
-     */
-    private $subscriber;
-
-    protected function setUp(): void
+    private function createNotificationService(ArrayLogger $logger): NotificationService
     {
-        parent::setUp();
+        $baseInfo = new BaseInfo();
+        $baseInfo->setEmail01('shop@example.com');
+        $baseInfo->setShopName('テストショップ');
 
-        $this->notificationService = $this->createMock(NotificationService::class);
-        $this->requestStack = $this->createMock(\Symfony\Component\HttpFoundation\RequestStack::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $config = new Config();
+        $config->setAdminTo('admin@example.com');
 
-        $this->subscriber = new CustomerChangeSubscriber(
-            $this->notificationService,
-            $this->requestStack,
-            $this->logger
+        $transport = new Swift_Transport_CapturingTransport();
+        $loader = new Twig_Loader_Filesystem([__DIR__ . '/../../Resource/template']);
+
+        return new NotificationService(
+            new Swift_Mailer($transport),
+            new Twig_Environment($loader),
+            new BaseInfoRepositoryStub($baseInfo),
+            new ConfigRepositoryStub($config),
+            new DiffBuilder(['email', 'name01', 'name02']),
+            $logger
         );
     }
 
-    /**
-     * getSubscribedEvents が適切なイベントを返すことを確認.
-     */
-    public function testGetSubscribedEvents(): void
+    public function testOnFlushQueuesAndPostFlushSendsNotifications(): void
     {
-        $events = $this->subscriber->getSubscribedEvents();
+        $logger = new ArrayLogger();
+        $serviceLogger = new ArrayLogger();
+        $notificationService = $this->createNotificationService($serviceLogger);
+        $transport = new Swift_Transport_CapturingTransport();
+        // 差し替え
+        $ref = new \ReflectionProperty(NotificationService::class, 'mailer');
+        $ref->setAccessible(true);
+        $ref->setValue($notificationService, new Swift_Mailer($transport));
 
-        $this->assertIsArray($events);
-        $this->assertContains(Events::onFlush, $events);
-        $this->assertContains(Events::postFlush, $events);
+        $requestStack = new RequestStack();
+        $requestStack->push(new Request());
+        $subscriber = new CustomerChangeSubscriber($notificationService, $requestStack, $logger);
+
+        $em = new EntityManager();
+        $customer = new Customer();
+        $customer->setId(10);
+        $customer->setEmail('old@example.com');
+        $customer->setName01('山田');
+        $customer->setName02('太郎');
+
+        $em->persist($customer);
+        $em->getUnitOfWork()->takeSnapshot();
+
+        $customer->setEmail('new@example.com');
+        $em->flush();
+
+        $subscriber->onFlush(new OnFlushEventArgs($em));
+        $subscriber->postFlush(new PostFlushEventArgs($em));
+
+        $messages = $transport->messages();
+        $this->assertCount(2, $messages);
+
+        $infoLogs = $logger->filterByLevel('info');
+        $this->assertNotEmpty($infoLogs);
+        $this->assertStringContainsString('通知をキューに追加', $infoLogs[0]['message']);
+
+        $this->assertNotEmpty($serviceLogger->filterByLevel('info'));
     }
 
-    /**
-     * postFlush で空の通知キューの場合、何もしないことを確認.
-     */
-    public function testPostFlushWithEmptyQueueDoesNothing(): void
+    public function testPostFlushLogsErrorWhenNotifyFails(): void
     {
-        $postFlushArgs = $this->createMock(\Doctrine\ORM\Event\PostFlushEventArgs::class);
+        $logger = new ArrayLogger();
+        $requestStack = new RequestStack();
+        $requestStack->push(new Request());
 
-        // NotificationService::notify が呼ばれないことを確認
-        $this->notificationService
-            ->expects($this->never())
-            ->method('notify');
+        $failingService = new class($logger) extends NotificationService {
+            public function __construct($logger)
+            {
+                // ダミー依存の注入
+                $this->mailer = new Swift_Mailer(new Swift_Transport_CapturingTransport());
+                $loader = new Twig_Loader_Filesystem([__DIR__ . '/../../Resource/template']);
+                $this->twig = new Twig_Environment($loader);
+                $this->baseInfoRepository = new BaseInfoRepositoryStub(new BaseInfo());
+                $this->configRepository = new ConfigRepositoryStub(new Config());
+                $this->diffBuilder = new DiffBuilder(['email']);
+                $this->logger = $logger;
+            }
 
-        $this->subscriber->postFlush($postFlushArgs);
-    }
+            public function notify(\Eccube\Entity\Customer $customer, Diff $diff, ?Request $request = null): void
+            {
+                throw new \RuntimeException('failure');
+            }
+        };
 
-    /**
-     * onFlush で Customer 以外のエンティティは無視されることを確認.
-     *
-     * 注: 完全なテストには Doctrine の UnitOfWork のモックが必要です。
-     * このテストは基本的な構造を示すものです。
-     */
-    public function testOnFlushIgnoresNonCustomerEntities(): void
-    {
-        $em = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
-        $uow = $this->createMock(\Doctrine\ORM\UnitOfWork::class);
+        $subscriber = new CustomerChangeSubscriber($failingService, $requestStack, $logger);
 
-        $em->method('getUnitOfWork')->willReturn($uow);
+        $em = new EntityManager();
+        $customer = new Customer();
+        $customer->setId(20);
+        $customer->setEmail('before@example.com');
+        $em->persist($customer);
+        $em->getUnitOfWork()->takeSnapshot();
 
-        // Customer 以外のエンティティを返す
-        $otherEntity = new \stdClass();
-        $uow->method('getScheduledEntityUpdates')->willReturn([$otherEntity]);
+        $customer->setEmail('after@example.com');
+        $em->flush();
 
-        $onFlushArgs = $this->createMock(\Doctrine\ORM\Event\OnFlushEventArgs::class);
-        $onFlushArgs->method('getEntityManager')->willReturn($em);
+        $subscriber->onFlush(new OnFlushEventArgs($em));
+        $subscriber->postFlush(new PostFlushEventArgs($em));
 
-        // NotificationService::buildDiff が呼ばれないことを確認
-        $this->notificationService
-            ->expects($this->never())
-            ->method('buildDiff');
-
-        $this->subscriber->onFlush($onFlushArgs);
-    }
-
-    /**
-     * onFlush で差分が空の場合、通知がキューに追加されないことを確認.
-     *
-     * 注: 完全なテストには Doctrine エンティティのモックが必要です。
-     */
-    public function testOnFlushWithEmptyDiffDoesNotQueue(): void
-    {
-        $customer = $this->createMock(\Eccube\Entity\Customer::class);
-        $customer->method('getId')->willReturn(789);
-        $customer->method('getEmail')->willReturn('test@example.com');
-
-        $em = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
-        $uow = $this->createMock(\Doctrine\ORM\UnitOfWork::class);
-
-        $em->method('getUnitOfWork')->willReturn($uow);
-        $uow->method('getScheduledEntityUpdates')->willReturn([$customer]);
-        $uow->method('getEntityChangeSet')->willReturn([]);
-
-        $emptyDiff = new Diff();
-        $this->notificationService
-            ->method('buildDiff')
-            ->willReturn($emptyDiff);
-
-        $onFlushArgs = $this->createMock(\Doctrine\ORM\Event\OnFlushEventArgs::class);
-        $onFlushArgs->method('getEntityManager')->willReturn($em);
-
-        // ログが記録されることを確認（変更検知のログ）
-        $this->logger
-            ->expects($this->atLeastOnce())
-            ->method('debug');
-
-        $this->subscriber->onFlush($onFlushArgs);
-
-        // postFlush で何も通知されないことを後で確認できる
-        $postFlushArgs = $this->createMock(\Doctrine\ORM\Event\PostFlushEventArgs::class);
-        $this->notificationService
-            ->expects($this->never())
-            ->method('notify');
-
-        $this->subscriber->postFlush($postFlushArgs);
+        $errors = $logger->filterByLevel('error');
+        $this->assertNotEmpty($errors);
+        $this->assertStringContainsString('通知処理でエラー発生', $errors[0]['message']);
     }
 }
