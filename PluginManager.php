@@ -167,6 +167,7 @@ class PluginManager extends AbstractPluginManager
             if ($currentTemplate && $currentTemplate !== $legacyTemplate) {
                 $em->remove($currentTemplate);
                 $em->flush();
+                $em->flush();
             }
 
             $legacyTemplate->setFileName($current);
