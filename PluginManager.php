@@ -14,10 +14,16 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 class PluginManager extends AbstractPluginManager
 {
     /** @var string 管理者向けメールテンプレの file_name */
-    const ADMIN_TEMPLATE_FILE = 'CustomerChangeNotify/admin';
+    const ADMIN_TEMPLATE_FILE = 'CustomerChangeNotify/Mail/customer_change_admin_mail';
 
     /** @var string 会員向けメールテンプレの file_name */
-    const MEMBER_TEMPLATE_FILE = 'CustomerChangeNotify/member';
+    const MEMBER_TEMPLATE_FILE = 'CustomerChangeNotify/Mail/customer_change_member_mail';
+
+    /** @var array<string, string> 旧テンプレートパスのマッピング */
+    private const LEGACY_TEMPLATE_FILE_MAP = [
+        'CustomerChangeNotify/admin' => self::ADMIN_TEMPLATE_FILE,
+        'CustomerChangeNotify/member' => self::MEMBER_TEMPLATE_FILE,
+    ];
 
     /**
      * プラグインインストール時
@@ -101,6 +107,11 @@ class PluginManager extends AbstractPluginManager
 
         // 以前のバージョンからアップグレードする際にも Config テーブルが確実に存在するようにする.
         $this->createConfigTable($em);
+
+        // 旧テンプレートパスを最新の Twig パスへ移行
+        $this->migrateMailTemplateFileNames($em);
+
+        $em->flush();
     }
 
     /**
@@ -128,6 +139,33 @@ class PluginManager extends AbstractPluginManager
         $mt->setDelFlg(0);
 
         $em->persist($mt);
+    }
+
+    /**
+     * 旧バージョンで作成された MailTemplate の file_name を Twig の実パスへ移行する.
+     *
+     * @param EntityManagerInterface $em
+     */
+    protected function migrateMailTemplateFileNames(EntityManagerInterface $em): void
+    {
+        $repo = $em->getRepository(MailTemplate::class);
+
+        foreach (self::LEGACY_TEMPLATE_FILE_MAP as $legacy => $current) {
+            /** @var MailTemplate|null $legacyTemplate */
+            $legacyTemplate = $repo->findOneBy(['file_name' => $legacy]);
+            if (!$legacyTemplate) {
+                continue;
+            }
+
+            /** @var MailTemplate|null $currentTemplate */
+            $currentTemplate = $repo->findOneBy(['file_name' => $current]);
+            if ($currentTemplate && $currentTemplate !== $legacyTemplate) {
+                $em->remove($currentTemplate);
+            }
+
+            $legacyTemplate->setFileName($current);
+            $em->persist($legacyTemplate);
+        }
     }
 
     /**
