@@ -9,9 +9,9 @@
 
 【変更内容】
 {% for field, change in diff %}
-- {{ field }}:
-    旧: {{ change.old }}
-    新: {{ change.new }}
+- {{ change.label }}:
+    旧: {{ change.old_formatted }}
+    新: {{ change.new_formatted }}
 {% endfor %}
 
 ※本メールはシステムから自動送信されています。
