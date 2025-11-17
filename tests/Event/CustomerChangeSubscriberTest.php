@@ -172,13 +172,26 @@ class CustomerChangeSubscriberTest extends TestCase
             ->method('buildDiff')
             ->willReturnOnConsecutiveCalls($diff1, $diff2);
 
+        $expectedNotifyArgs = [
+            [$customer1, $diff1],
+            [$customer2, $diff2],
+        ];
+        $callIndex = 0;
         $this->notificationService
             ->expects($this->exactly(2))
             ->method('notify')
-            ->withConsecutive(
-                [$customer1, $diff1, $this->anything()],
-                [$customer2, $diff2, $this->anything()]
-            );
+            ->with(
+                $this->callback(function ($customer) use (&$callIndex, $expectedNotifyArgs) {
+                    return $customer === $expectedNotifyArgs[$callIndex][0];
+                }),
+                $this->callback(function ($diff) use (&$callIndex, $expectedNotifyArgs) {
+                    return $diff === $expectedNotifyArgs[$callIndex][1];
+                }),
+                $this->anything()
+            )
+            ->willReturnCallback(function () use (&$callIndex) {
+                $callIndex++;
+            });
 
         $this->requestStack
             ->method('getCurrentRequest')
