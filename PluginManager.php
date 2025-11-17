@@ -2,14 +2,16 @@
 namespace Plugin\CustomerChangeNotify;
 
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Tools\SchemaTool;
 use Eccube\Entity\MailTemplate;
-use Eccube\Plugin\AbstractPlugin;
-use Eccube\Plugin\PluginManagerInterface;
+use Eccube\Plugin\AbstractPluginManager;
+use Plugin\CustomerChangeNotify\Entity\Config;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * 会員情報変更通知プラグイン
  */
-class Plugin extends AbstractPlugin
+class PluginManager extends AbstractPluginManager
 {
     /** @var string 管理者向けメールテンプレの file_name */
     const ADMIN_TEMPLATE_FILE = 'CustomerChangeNotify/admin';
@@ -20,13 +22,16 @@ class Plugin extends AbstractPlugin
     /**
      * プラグインインストール時
      *
-     * @param PluginManagerInterface $pluginManager
+     * @param array $meta
+     * @param ContainerInterface $container
      */
-    public function install(PluginManagerInterface $pluginManager)
+    public function install(array $meta, ContainerInterface $container)
     {
-        $app = $pluginManager->getApplication();
         /** @var EntityManagerInterface $em */
-        $em = $app['orm.em'];
+        $em = $container->get('doctrine.orm.entity_manager');
+
+        // Config テーブルを作成
+        $this->createConfigTable($em);
 
         // 既に作られていないかチェックしつつ MailTemplate を登録
         $this->createMailTemplate($em, self::ADMIN_TEMPLATE_FILE, '会員情報変更通知（管理者向け）');
@@ -38,13 +43,13 @@ class Plugin extends AbstractPlugin
     /**
      * プラグインアンインストール時
      *
-     * @param PluginManagerInterface $pluginManager
+     * @param array $meta
+     * @param ContainerInterface $container
      */
-    public function uninstall(PluginManagerInterface $pluginManager)
+    public function uninstall(array $meta, ContainerInterface $container)
     {
-        $app = $pluginManager->getApplication();
         /** @var EntityManagerInterface $em */
-        $em = $app['orm.em'];
+        $em = $container->get('doctrine.orm.entity_manager');
         $repo = $em->getRepository(MailTemplate::class);
 
         foreach ([self::ADMIN_TEMPLATE_FILE, self::MEMBER_TEMPLATE_FILE] as $fileName) {
@@ -55,15 +60,19 @@ class Plugin extends AbstractPlugin
             }
         }
 
+        // Config テーブルを削除
+        $this->dropConfigTable($em);
+
         $em->flush();
     }
 
     /**
      * プラグイン有効化時
      *
-     * @param PluginManagerInterface $pluginManager
+     * @param array $meta
+     * @param ContainerInterface $container
      */
-    public function enable(PluginManagerInterface $pluginManager)
+    public function enable(array $meta, ContainerInterface $container)
     {
         // 必要に応じて実装
     }
@@ -71,9 +80,10 @@ class Plugin extends AbstractPlugin
     /**
      * プラグイン無効化時
      *
-     * @param PluginManagerInterface $pluginManager
+     * @param array $meta
+     * @param ContainerInterface $container
      */
-    public function disable(PluginManagerInterface $pluginManager)
+    public function disable(array $meta, ContainerInterface $container)
     {
         // 必要に応じて実装
     }
@@ -81,11 +91,16 @@ class Plugin extends AbstractPlugin
     /**
      * プラグインアップデート時
      *
-     * @param PluginManagerInterface $pluginManager
+     * @param array $meta
+     * @param ContainerInterface $container
      */
-    public function update(PluginManagerInterface $pluginManager)
+    public function update(array $meta, ContainerInterface $container)
     {
-        // バージョンアップ時の追加処理があれば実装
+        /** @var EntityManagerInterface $em */
+        $em = $container->get('doctrine.orm.entity_manager');
+
+        // 以前のバージョンからアップグレードする際にも Config テーブルが確実に存在するようにする.
+        $this->createConfigTable($em);
     }
 
     /**
@@ -113,5 +128,41 @@ class Plugin extends AbstractPlugin
         $mt->setDelFlg(0);
 
         $em->persist($mt);
+    }
+
+    /**
+     * Config テーブルを作成.
+     *
+     * @param EntityManagerInterface $em
+     */
+    protected function createConfigTable(EntityManagerInterface $em): void
+    {
+        $metadata = $em->getClassMetadata(Config::class);
+        $schemaTool = new SchemaTool($em);
+
+        try {
+            // テーブルが存在しない場合のみ作成
+            $schemaTool->createSchema([$metadata]);
+        } catch (\Exception $e) {
+            // テーブルが既に存在する場合は無視
+        }
+    }
+
+    /**
+     * Config テーブルを削除.
+     *
+     * @param EntityManagerInterface $em
+     */
+    protected function dropConfigTable(EntityManagerInterface $em): void
+    {
+        $metadata = $em->getClassMetadata(Config::class);
+        $schemaTool = new SchemaTool($em);
+
+        try {
+            // テーブルを削除
+            $schemaTool->dropSchema([$metadata]);
+        } catch (\Exception $e) {
+            // テーブルが存在しない場合は無視
+        }
     }
 }

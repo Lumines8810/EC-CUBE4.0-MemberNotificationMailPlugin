@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Composer
+/vendor/
+composer.lock
+
+# PHPUnit
+/phpunit.xml.dist
+/.phpunit.result.cache
+/coverage/
+/build/
+
+# Temporary files
+*.tmp
+*.bak
+*.log

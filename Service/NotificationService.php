@@ -4,8 +4,10 @@ namespace Plugin\CustomerChangeNotify\Service;
 
 use Eccube\Entity\Customer;
 use Eccube\Repository\BaseInfoRepository;
+use Plugin\CustomerChangeNotify\Repository\ConfigRepository;
 use Plugin\CustomerChangeNotify\Service\DiffBuilder;
 use Plugin\CustomerChangeNotify\Service\Diff;
+use Psr\Log\LoggerInterface;
 use Swift_Mailer;
 use Swift_Message;
 use Symfony\Component\HttpFoundation\Request;
@@ -31,34 +33,42 @@ class NotificationService
     private $baseInfoRepository;
 
     /**
+     * @var ConfigRepository
+     */
+    private $configRepository;
+
+    /**
      * @var DiffBuilder
      */
     private $diffBuilder;
 
     /**
-     * @var string|null
+     * @var LoggerInterface
      */
-    private $adminTo;
+    private $logger;
 
     /**
      * @param Swift_Mailer        $mailer
      * @param \Twig_Environment   $twig
      * @param BaseInfoRepository  $baseInfoRepository
+     * @param ConfigRepository    $configRepository
      * @param DiffBuilder         $diffBuilder
-     * @param string|null         $adminTo          管理者通知先メールアドレス（null の場合は BaseInfo.email01）
+     * @param LoggerInterface     $logger
      */
     public function __construct(
         Swift_Mailer $mailer,
         \Twig_Environment $twig,
         BaseInfoRepository $baseInfoRepository,
+        ConfigRepository $configRepository,
         DiffBuilder $diffBuilder,
-        ?string $adminTo = null
+        LoggerInterface $logger
     ) {
         $this->mailer = $mailer;
         $this->twig = $twig;
         $this->baseInfoRepository = $baseInfoRepository;
+        $this->configRepository = $configRepository;
         $this->diffBuilder = $diffBuilder;
-        $this->adminTo = $adminTo;
+        $this->logger = $logger;
     }
 
     /**
@@ -71,7 +81,17 @@ class NotificationService
      */
     public function buildDiff(Customer $customer, array $changeSet): Diff
     {
-        return $this->diffBuilder->build($customer, $changeSet);
+        $diff = $this->diffBuilder->build($customer, $changeSet);
+
+        if (!$diff->isEmpty()) {
+            $this->logger->info('[CustomerChangeNotify] 会員情報の変更を検知', [
+                'customer_id' => $customer->getId(),
+                'customer_email' => $customer->getEmail(),
+                'changed_fields' => array_keys($diff->getChanges()),
+            ]);
+        }
+
+        return $diff;
     }
 
     /**
@@ -88,52 +108,106 @@ class NotificationService
             return;
         }
 
-        $BaseInfo = $this->baseInfoRepository->get();
+        try {
+            $BaseInfo = $this->baseInfoRepository->get();
+            $Config = $this->configRepository->get();
 
-        // From / 管理者宛て
-        $fromAddress = $BaseInfo->getEmail01();
-        $fromName = $BaseInfo->getShopName();
-        $adminTo = $this->adminTo ?: $fromAddress;
+            // From / 管理者宛て
+            $fromAddress = $BaseInfo->getEmail01();
+            $fromName = $BaseInfo->getShopName();
+            $adminTo = $Config->getAdminTo() ?: $fromAddress;
 
-        $context = [
-            'Customer' => $customer,
-            'diff'     => $diff->getChanges(),
-            'request'  => $request,
-        ];
+            $context = [
+                'Customer' => $customer,
+                'diff'     => $diff->getChanges(),
+                'request'  => $request,
+            ];
 
-        // ------------------
-        // 管理者向けメール
-        // ------------------
-        $adminSubject = '会員情報変更通知（管理者向け）';
+            $this->logger->info('[CustomerChangeNotify] メール送信を開始', [
+                'customer_id' => $customer->getId(),
+                'customer_email' => $customer->getEmail(),
+                'admin_to' => $adminTo,
+            ]);
 
-        $adminBody = $this->twig->render(
-            // プラグイン内 Twig (前提として Resource/template/Mail/customer_change_admin_mail.twig が存在)
-            'CustomerChangeNotify/Mail/customer_change_admin_mail.twig',
-            $context
-        );
+            // ------------------
+            // 管理者向けメール
+            // ------------------
+            $adminSubject = $Config->getAdminSubject();
 
-        $adminMessage = (new Swift_Message($adminSubject))
-            ->setFrom([$fromAddress => $fromName])
-            ->setTo([$adminTo])
-            ->setBody($adminBody);
+            try {
+                $adminBody = $this->twig->render(
+                    // プラグイン内 Twig (前提として Resource/template/Mail/customer_change_admin_mail.twig が存在)
+                    'CustomerChangeNotify/Mail/customer_change_admin_mail.twig',
+                    $context
+                );
 
-        $this->mailer->send($adminMessage);
+                $adminMessage = (new Swift_Message($adminSubject))
+                    ->setFrom([$fromAddress => $fromName])
+                    ->setTo([$adminTo])
+                    ->setBody($adminBody);
 
-        // ------------------
-        // 会員本人向けメール
-        // ------------------
-        $memberSubject = '会員情報が変更されました';
+                $adminSent = $this->mailer->send($adminMessage);
 
-        $memberBody = $this->twig->render(
-            'CustomerChangeNotify/Mail/customer_change_member_mail.twig',
-            $context
-        );
+                if ($adminSent > 0) {
+                    $this->logger->info('[CustomerChangeNotify] 管理者向けメール送信成功', [
+                        'to' => $adminTo,
+                        'subject' => $adminSubject,
+                    ]);
+                } else {
+                    $this->logger->warning('[CustomerChangeNotify] 管理者向けメール送信失敗（送信数: 0）', [
+                        'to' => $adminTo,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $this->logger->error('[CustomerChangeNotify] 管理者向けメール送信エラー', [
+                    'to' => $adminTo,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
 
-        $memberMessage = (new Swift_Message($memberSubject))
-            ->setFrom([$fromAddress => $fromName])
-            ->setTo([$customer->getEmail()])
-            ->setBody($memberBody);
+            // ------------------
+            // 会員本人向けメール
+            // ------------------
+            $memberSubject = $Config->getMemberSubject();
 
-        $this->mailer->send($memberMessage);
+            try {
+                $memberBody = $this->twig->render(
+                    'CustomerChangeNotify/Mail/customer_change_member_mail.twig',
+                    $context
+                );
+
+                $memberMessage = (new Swift_Message($memberSubject))
+                    ->setFrom([$fromAddress => $fromName])
+                    ->setTo([$customer->getEmail()])
+                    ->setBody($memberBody);
+
+                $memberSent = $this->mailer->send($memberMessage);
+
+                if ($memberSent > 0) {
+                    $this->logger->info('[CustomerChangeNotify] 会員向けメール送信成功', [
+                        'to' => $customer->getEmail(),
+                        'subject' => $memberSubject,
+                    ]);
+                } else {
+                    $this->logger->warning('[CustomerChangeNotify] 会員向けメール送信失敗（送信数: 0）', [
+                        'to' => $customer->getEmail(),
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $this->logger->error('[CustomerChangeNotify] 会員向けメール送信エラー', [
+                    'to' => $customer->getEmail(),
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('[CustomerChangeNotify] 通知処理で予期しないエラーが発生', [
+                'customer_id' => $customer->getId(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            // エラーが発生しても、元のトランザクションには影響を与えないようにする
+        }
     }
 }
