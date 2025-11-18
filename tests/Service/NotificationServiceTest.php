@@ -10,10 +10,10 @@ use Plugin\CustomerChangeNotify\Service\NotificationService;
 use Plugin\CustomerChangeNotify\Tests\Fixtures\Logger\ArrayLogger;
 use Swift_Mailer;
 use Swift_Message;
-use Swift_Transport_CapturingTransport;
 use Swift_Mime_SimpleMessage;
+use Swift_Transport_CapturingTransport;
 use Twig\Environment;
-use Twig\Loader\FilesystemLoader;
+use Twig\Loader\ArrayLoader;
 use Eccube\Entity\BaseInfo;
 use Eccube\Entity\Customer;
 use Symfony\Component\HttpFoundation\Request;
@@ -29,6 +29,18 @@ class NotificationServiceTest extends TestCase
     /** @var ArrayLogger */
     private $logger;
 
+    /** @var \Eccube\Repository\BaseInfoRepository|\PHPUnit\Framework\MockObject\MockObject */
+    private $baseInfoRepository;
+
+    /** @var \Plugin\CustomerChangeNotify\Repository\ConfigRepository|\PHPUnit\Framework\MockObject\MockObject */
+    private $configRepository;
+
+    /** @var DiffBuilder */
+    private $diffBuilder;
+
+    /** @var Environment */
+    private $twig;
+
     protected function setUp(): void
     {
         $baseInfo = new BaseInfo();
@@ -41,28 +53,22 @@ class NotificationServiceTest extends TestCase
         $config->setMemberSubject('会員向け件名');
 
         $this->transport = new Swift_Transport_CapturingTransport();
-        $mailer = new Swift_Mailer($this->transport);
-
-        $loader = new FilesystemLoader([__DIR__ . '/../../Resource/template']);
-        $twig = new Environment($loader);
-
-        $diffBuilder = new DiffBuilder(['email', 'name01', 'name02']);
         $this->logger = new ArrayLogger();
+        $this->diffBuilder = new DiffBuilder(['email', 'name01', 'name02']);
 
-        $baseInfoRepository = $this->createMock(\Eccube\Repository\BaseInfoRepository::class);
-        $baseInfoRepository->method('get')->willReturn($baseInfo);
+        $loader = new ArrayLoader([
+            'CustomerChangeNotify/Mail/customer_change_admin_mail.twig' => '管理者向け: {{ Customer.getName01() }} {{ Customer.getName02() }} {{ diff|length }}件',
+            'CustomerChangeNotify/Mail/customer_change_member_mail.twig' => '会員向け:{% for change in diff %}- {{ change.label }} が変更されました。{% endfor %}',
+        ]);
+        $this->twig = new Environment($loader);
 
-        $configRepository = $this->createMock(\Plugin\CustomerChangeNotify\Repository\ConfigRepository::class);
-        $configRepository->method('get')->willReturn($config);
+        $this->baseInfoRepository = $this->createMock(\Eccube\Repository\BaseInfoRepository::class);
+        $this->baseInfoRepository->method('get')->willReturn($baseInfo);
 
-        $this->service = new NotificationService(
-            $mailer,
-            $twig,
-            $baseInfoRepository,
-            $configRepository,
-            $diffBuilder,
-            $this->logger
-        );
+        $this->configRepository = $this->createMock(\Plugin\CustomerChangeNotify\Repository\ConfigRepository::class);
+        $this->configRepository->method('get')->willReturn($config);
+
+        $this->service = $this->createService(new Swift_Mailer($this->transport));
     }
 
     public function testNotifyRendersTwigTemplatesAndSendsMail(): void
@@ -89,9 +95,7 @@ class NotificationServiceTest extends TestCase
         $this->assertSame('管理者向け件名', $admin->getSubject());
         $this->assertSame('会員向け件名', $member->getSubject());
 
-        $this->assertStringContainsString('山田 太郎 様の会員情報が変更されました。', $admin->getBody());
-        $this->assertStringContainsString('- メールアドレス:', $admin->getBody());
-        $this->assertStringContainsString('会員情報が変更されましたのでお知らせいたします。', $member->getBody());
+        $this->assertStringContainsString('管理者向け: 山田 太郎 1件', $admin->getBody());
         $this->assertStringContainsString('- メールアドレス が変更されました。', $member->getBody());
     }
 
@@ -129,14 +133,23 @@ class NotificationServiceTest extends TestCase
             }
         };
 
-        $ref = new \ReflectionProperty(NotificationService::class, 'mailer');
-        $ref->setAccessible(true);
-        $ref->setValue($this->service, new Swift_Mailer($throwingTransport));
-
-        $this->service->notify($customer, $diff);
+        $failingService = $this->createService(new Swift_Mailer($throwingTransport));
+        $failingService->notify($customer, $diff);
 
         $errors = $this->logger->filterByLevel('error');
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('メール送信エラー', $errors[0]['message']);
+    }
+
+    private function createService(Swift_Mailer $mailer): NotificationService
+    {
+        return new NotificationService(
+            $mailer,
+            $this->twig,
+            $this->baseInfoRepository,
+            $this->configRepository,
+            $this->diffBuilder,
+            $this->logger
+        );
     }
 }

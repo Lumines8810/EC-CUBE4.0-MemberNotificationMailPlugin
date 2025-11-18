@@ -77,14 +77,7 @@ class CustomerChangeSubscriber implements EventSubscriber
         // If a previous flush aborted before postFlush ran, stale notifications
         // could remain queued. Ensure each flush cycle starts with a clean slate
         // so rolled-back changes are not delivered on a later successful flush.
-        if (!empty($this->pendingNotifications)) {
-            $queueSize = count($this->pendingNotifications);
-            $this->pendingNotifications = [];
-
-            $this->logger->debug('[CustomerChangeNotify] onFlush: 前回の flush で残った通知キューをリセット', [
-                'cleared_count' => $queueSize,
-            ]);
-        }
+        $this->resetPendingNotifications('onFlush');
 
         $request = $this->requestStack->getCurrentRequest();
 
@@ -155,12 +148,7 @@ class CustomerChangeSubscriber implements EventSubscriber
                 'trace' => $e->getTraceAsString(),
             ]);
         } finally {
-            // flush のたびにリセットする.
-            $queueSize = count($this->pendingNotifications);
-            $this->pendingNotifications = [];
-            $this->logger->debug('[CustomerChangeNotify] 通知キューをリセット', [
-                'cleared_count' => $queueSize,
-            ]);
+            $this->resetPendingNotifications('postFlush');
         }
     }
 
@@ -169,6 +157,11 @@ class CustomerChangeSubscriber implements EventSubscriber
      */
     public function onClear(OnClearEventArgs $args): void
     {
+        $this->resetPendingNotifications('onClear');
+    }
+
+    private function resetPendingNotifications(string $reason): void
+    {
         if (empty($this->pendingNotifications)) {
             return;
         }
@@ -176,7 +169,7 @@ class CustomerChangeSubscriber implements EventSubscriber
         $queueSize = count($this->pendingNotifications);
         $this->pendingNotifications = [];
 
-        $this->logger->debug('[CustomerChangeNotify] onClear: 通知キューをリセット', [
+        $this->logger->debug(sprintf('[CustomerChangeNotify] %s: 通知キューをリセット', $reason), [
             'cleared_count' => $queueSize,
         ]);
     }

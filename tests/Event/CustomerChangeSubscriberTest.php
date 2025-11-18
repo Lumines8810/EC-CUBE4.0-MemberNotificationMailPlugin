@@ -24,7 +24,10 @@ use Twig\Loader\FilesystemLoader;
 
 class CustomerChangeSubscriberTest extends TestCase
 {
-    private function createNotificationService(ArrayLogger $logger): NotificationService
+    /**
+     * @return array{0: NotificationService, 1: Swift_Transport_CapturingTransport}
+     */
+    private function createNotificationService(ArrayLogger $logger, ?Swift_Transport_CapturingTransport $transport = null): array
     {
         $baseInfo = new BaseInfo();
         $baseInfo->setEmail01('shop@example.com');
@@ -33,7 +36,7 @@ class CustomerChangeSubscriberTest extends TestCase
         $config = new Config();
         $config->setAdminTo('admin@example.com');
 
-        $transport = new Swift_Transport_CapturingTransport();
+        $transport = $transport ?: new Swift_Transport_CapturingTransport();
         $loader = new FilesystemLoader([__DIR__ . '/../../Resource/template']);
 
         $baseInfoRepository = $this->createMock(\Eccube\Repository\BaseInfoRepository::class);
@@ -42,7 +45,7 @@ class CustomerChangeSubscriberTest extends TestCase
         $configRepository = $this->createMock(\Plugin\CustomerChangeNotify\Repository\ConfigRepository::class);
         $configRepository->method('get')->willReturn($config);
 
-        return new NotificationService(
+        $service = new NotificationService(
             new Swift_Mailer($transport),
             new Environment($loader),
             $baseInfoRepository,
@@ -50,18 +53,15 @@ class CustomerChangeSubscriberTest extends TestCase
             new DiffBuilder(['email', 'name01', 'name02']),
             $logger
         );
+
+        return [$service, $transport];
     }
 
     public function testOnFlushQueuesAndPostFlushSendsNotifications(): void
     {
         $logger = new ArrayLogger();
         $serviceLogger = new ArrayLogger();
-        $notificationService = $this->createNotificationService($serviceLogger);
-        $transport = new Swift_Transport_CapturingTransport();
-        // 差し替え
-        $ref = new \ReflectionProperty(NotificationService::class, 'mailer');
-        $ref->setAccessible(true);
-        $ref->setValue($notificationService, new Swift_Mailer($transport));
+        [$notificationService, $transport] = $this->createNotificationService($serviceLogger);
 
         $requestStack = new RequestStack();
         $requestStack->push(new Request());
@@ -108,48 +108,18 @@ class CustomerChangeSubscriberTest extends TestCase
         $requestStack = new RequestStack();
         $requestStack->push(new Request());
 
-        $baseService = $this->createNotificationService($logger);
+        $diff = new Diff();
+        $diff->addChange('email', 'メールアドレス', 'before@example.com', 'after@example.com', 'before@example.com', 'after@example.com');
 
-        $failingService = new class($baseService) extends NotificationService {
-            public function __construct(NotificationService $baseService)
-            {
-                $reflection = new \ReflectionClass(NotificationService::class);
+        $notificationService = $this->createMock(NotificationService::class);
+        $notificationService
+            ->method('buildDiff')
+            ->willReturn($diff);
+        $notificationService
+            ->method('notify')
+            ->willThrowException(new \RuntimeException('failure'));
 
-                $mailer = $reflection->getProperty('mailer');
-                $mailer->setAccessible(true);
-
-                $twig = $reflection->getProperty('twig');
-                $twig->setAccessible(true);
-
-                $baseInfoRepository = $reflection->getProperty('baseInfoRepository');
-                $baseInfoRepository->setAccessible(true);
-
-                $configRepository = $reflection->getProperty('configRepository');
-                $configRepository->setAccessible(true);
-
-                $diffBuilder = $reflection->getProperty('diffBuilder');
-                $diffBuilder->setAccessible(true);
-
-                $logger = $reflection->getProperty('logger');
-                $logger->setAccessible(true);
-
-                parent::__construct(
-                    $mailer->getValue($baseService),
-                    $twig->getValue($baseService),
-                    $baseInfoRepository->getValue($baseService),
-                    $configRepository->getValue($baseService),
-                    $diffBuilder->getValue($baseService),
-                    $logger->getValue($baseService)
-                );
-            }
-
-            public function notify(\Eccube\Entity\Customer $customer, Diff $diff, ?Request $request = null): void
-            {
-                throw new \RuntimeException('failure');
-            }
-        };
-
-        $subscriber = new CustomerChangeSubscriber($failingService, $requestStack, $logger);
+        $subscriber = new CustomerChangeSubscriber($notificationService, $requestStack, $logger);
 
         $customer = new Customer();
         $customer->setId(20);

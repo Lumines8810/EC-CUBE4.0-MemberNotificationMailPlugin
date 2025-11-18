@@ -19,26 +19,29 @@ class DiffBuilder
      */
     private $fieldLabels;
 
+    private const DEFAULT_FIELD_LABELS = [
+        'name01' => '姓',
+        'name02' => '名',
+        'kana01' => 'セイ',
+        'kana02' => 'メイ',
+        'email'  => 'メールアドレス',
+        'tel01'  => '電話番号（市外局番）',
+        'tel02'  => '電話番号（市内局番）',
+        'tel03'  => '電話番号（加入者番号）',
+        'zip01'  => '郵便番号（3桁）',
+        'zip02'  => '郵便番号（4桁）',
+        'addr01' => '住所1',
+        'addr02' => '住所2',
+    ];
+
     /**
-     * @param string[] $watchFields 監視対象フィールド
+     * @param string[]               $watchFields 監視対象フィールド
+     * @param array<string, string> $fieldLabels ラベル定義（任意）
      */
-    public function __construct(array $watchFields)
+    public function __construct(array $watchFields, array $fieldLabels = self::DEFAULT_FIELD_LABELS)
     {
         $this->watchFields = $watchFields;
-        $this->fieldLabels = [
-            'name01' => '姓',
-            'name02' => '名',
-            'kana01' => 'セイ',
-            'kana02' => 'メイ',
-            'email'  => 'メールアドレス',
-            'tel01'  => '電話番号（市外局番）',
-            'tel02'  => '電話番号（市内局番）',
-            'tel03'  => '電話番号（加入者番号）',
-            'zip01'  => '郵便番号（3桁）',
-            'zip02'  => '郵便番号（4桁）',
-            'addr01' => '住所1',
-            'addr02' => '住所2',
-        ];
+        $this->fieldLabels = $fieldLabels ?: self::DEFAULT_FIELD_LABELS;
     }
 
     /**

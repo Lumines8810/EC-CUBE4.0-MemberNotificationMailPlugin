@@ -20,3 +20,16 @@ services:
     autowire: true
     arguments:
       $watchFields: ['name01', 'name02', 'kana01', 'kana02', 'email', 'tel01', 'tel02', 'tel03', 'zip01', 'zip02', 'addr01', 'addr02']
+      $fieldLabels:
+        name01: '姓'
+        name02: '名'
+        kana01: 'セイ'
+        kana02: 'メイ'
+        email: 'メールアドレス'
+        tel01: '電話番号（市外局番）'
+        tel02: '電話番号（市内局番）'
+        tel03: '電話番号（加入者番号）'
+        zip01: '郵便番号（3桁）'
+        zip02: '郵便番号（4桁）'
+        addr01: '住所1'
+        addr02: '住所2'

@@ -130,78 +130,25 @@ class NotificationService
                 'admin_to' => $adminTo,
             ]);
 
-            // ------------------
-            // 管理者向けメール
-            // ------------------
-            $adminSubject = $Config->getAdminSubject();
+            $this->sendMail(
+                'CustomerChangeNotify/Mail/customer_change_admin_mail.twig',
+                $Config->getAdminSubject(),
+                $adminTo,
+                $context,
+                '管理者向けメール',
+                $fromAddress,
+                $fromName
+            );
 
-            try {
-        $adminBody = $this->twig->render(
-            // プラグイン内 Twig (前提として Resource/template/CustomerChangeNotify/Mail/customer_change_admin_mail.twig が存在)
-            'CustomerChangeNotify/Mail/customer_change_admin_mail.twig',
-            $context
-        );
-
-                $adminMessage = (new Swift_Message($adminSubject))
-                    ->setFrom([$fromAddress => $fromName])
-                    ->setTo([$adminTo])
-                    ->setBody($adminBody);
-
-                $adminSent = $this->mailer->send($adminMessage);
-
-                if ($adminSent > 0) {
-                    $this->logger->info('[CustomerChangeNotify] 管理者向けメール送信成功', [
-                        'to' => $adminTo,
-                        'subject' => $adminSubject,
-                    ]);
-                } else {
-                    $this->logger->warning('[CustomerChangeNotify] 管理者向けメール送信失敗（送信数: 0）', [
-                        'to' => $adminTo,
-                    ]);
-                }
-            } catch (\Exception $e) {
-                $this->logger->error('[CustomerChangeNotify] 管理者向けメール送信エラー', [
-                    'to' => $adminTo,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
-            }
-
-            // ------------------
-            // 会員本人向けメール
-            // ------------------
-            $memberSubject = $Config->getMemberSubject();
-
-            try {
-        $memberBody = $this->twig->render(
-            'CustomerChangeNotify/Mail/customer_change_member_mail.twig',
-            $context
-        );
-
-                $memberMessage = (new Swift_Message($memberSubject))
-                    ->setFrom([$fromAddress => $fromName])
-                    ->setTo([$customer->getEmail()])
-                    ->setBody($memberBody);
-
-                $memberSent = $this->mailer->send($memberMessage);
-
-                if ($memberSent > 0) {
-                    $this->logger->info('[CustomerChangeNotify] 会員向けメール送信成功', [
-                        'to' => $customer->getEmail(),
-                        'subject' => $memberSubject,
-                    ]);
-                } else {
-                    $this->logger->warning('[CustomerChangeNotify] 会員向けメール送信失敗（送信数: 0）', [
-                        'to' => $customer->getEmail(),
-                    ]);
-                }
-            } catch (\Exception $e) {
-                $this->logger->error('[CustomerChangeNotify] 会員向けメール送信エラー', [
-                    'to' => $customer->getEmail(),
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
-            }
+            $this->sendMail(
+                'CustomerChangeNotify/Mail/customer_change_member_mail.twig',
+                $Config->getMemberSubject(),
+                $customer->getEmail(),
+                $context,
+                '会員向けメール',
+                $fromAddress,
+                $fromName
+            );
         } catch (\Exception $e) {
             $this->logger->error('[CustomerChangeNotify] 通知処理で予期しないエラーが発生', [
                 'customer_id' => $customer->getId(),
@@ -209,6 +156,47 @@ class NotificationService
                 'trace' => $e->getTraceAsString(),
             ]);
             // エラーが発生しても、元のトランザクションには影響を与えないようにする
+        }
+    }
+
+    /**
+     * Twig テンプレートをレンダリングしてメール送信する共通ヘルパ.
+     */
+    private function sendMail(
+        string $template,
+        string $subject,
+        string $recipient,
+        array $context,
+        string $label,
+        string $fromAddress,
+        string $fromName
+    ): void {
+        try {
+            $body = $this->twig->render($template, $context);
+
+            $message = (new Swift_Message($subject))
+                ->setFrom([$fromAddress => $fromName])
+                ->setTo([$recipient])
+                ->setBody($body);
+
+            $sent = $this->mailer->send($message);
+
+            if ($sent > 0) {
+                $this->logger->info(sprintf('[CustomerChangeNotify] %s送信成功', $label), [
+                    'to' => $recipient,
+                    'subject' => $subject,
+                ]);
+            } else {
+                $this->logger->warning(sprintf('[CustomerChangeNotify] %s送信失敗（送信数: 0）', $label), [
+                    'to' => $recipient,
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->logger->error(sprintf('[CustomerChangeNotify] %s送信エラー', $label), [
+                'to' => $recipient,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
     }
 }
