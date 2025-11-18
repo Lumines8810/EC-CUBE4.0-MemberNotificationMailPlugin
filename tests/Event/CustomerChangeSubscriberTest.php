@@ -9,24 +9,18 @@ use Plugin\CustomerChangeNotify\Service\Diff;
 use Plugin\CustomerChangeNotify\Service\DiffBuilder;
 use Plugin\CustomerChangeNotify\Service\NotificationService;
 use Plugin\CustomerChangeNotify\Tests\Fixtures\Logger\ArrayLogger;
-use Plugin\CustomerChangeNotify\Tests\Fixtures\Repository\BaseInfoRepositoryStub;
-use Plugin\CustomerChangeNotify\Tests\Fixtures\Repository\ConfigRepositoryStub;
-use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Event\OnFlushEventArgs;
 use Doctrine\ORM\Event\PostFlushEventArgs;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\UnitOfWork;
 use Eccube\Entity\BaseInfo;
 use Eccube\Entity\Customer;
 use Swift_Mailer;
 use Swift_Transport_CapturingTransport;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Twig_Environment;
-use Twig_Loader_Filesystem;
-
-require_once __DIR__ . '/../../Event/CustomerChangeSubscriber.php';
-require_once __DIR__ . '/../../Service/NotificationService.php';
-require_once __DIR__ . '/../../Service/DiffBuilder.php';
-require_once __DIR__ . '/../../Service/Diff.php';
+use Twig\Environment;
+use Twig\Loader\FilesystemLoader;
 
 class CustomerChangeSubscriberTest extends TestCase
 {
@@ -40,13 +34,19 @@ class CustomerChangeSubscriberTest extends TestCase
         $config->setAdminTo('admin@example.com');
 
         $transport = new Swift_Transport_CapturingTransport();
-        $loader = new Twig_Loader_Filesystem([__DIR__ . '/../../Resource/template']);
+        $loader = new FilesystemLoader([__DIR__ . '/../../Resource/template']);
+
+        $baseInfoRepository = $this->createMock(\Eccube\Repository\BaseInfoRepository::class);
+        $baseInfoRepository->method('get')->willReturn($baseInfo);
+
+        $configRepository = $this->createMock(\Plugin\CustomerChangeNotify\Repository\ConfigRepository::class);
+        $configRepository->method('get')->willReturn($config);
 
         return new NotificationService(
             new Swift_Mailer($transport),
-            new Twig_Environment($loader),
-            new BaseInfoRepositoryStub($baseInfo),
-            new ConfigRepositoryStub($config),
+            new Environment($loader),
+            $baseInfoRepository,
+            $configRepository,
             new DiffBuilder(['email', 'name01', 'name02']),
             $logger
         );
@@ -67,21 +67,30 @@ class CustomerChangeSubscriberTest extends TestCase
         $requestStack->push(new Request());
         $subscriber = new CustomerChangeSubscriber($notificationService, $requestStack, $logger);
 
-        $em = new EntityManager();
         $customer = new Customer();
         $customer->setId(10);
         $customer->setEmail('old@example.com');
         $customer->setName01('山田');
         $customer->setName02('太郎');
-
-        $em->persist($customer);
-        $em->getUnitOfWork()->takeSnapshot();
-
         $customer->setEmail('new@example.com');
-        $em->flush();
 
-        $subscriber->onFlush(new OnFlushEventArgs($em));
-        $subscriber->postFlush(new PostFlushEventArgs($em));
+        $uow = $this->createMock(UnitOfWork::class);
+        $uow->method('getScheduledEntityUpdates')->willReturn([$customer]);
+        $uow->method('getEntityChangeSet')->with($customer)->willReturn([
+            'email' => ['old@example.com', 'new@example.com'],
+        ]);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getUnitOfWork')->willReturn($uow);
+
+        $onFlushArgs = $this->createMock(OnFlushEventArgs::class);
+        $onFlushArgs->method('getEntityManager')->willReturn($em);
+
+        $postFlushArgs = $this->createMock(PostFlushEventArgs::class);
+        $postFlushArgs->method('getEntityManager')->willReturn($em);
+
+        $subscriber->onFlush($onFlushArgs);
+        $subscriber->postFlush($postFlushArgs);
 
         $messages = $transport->messages();
         $this->assertCount(2, $messages);
@@ -142,18 +151,26 @@ class CustomerChangeSubscriberTest extends TestCase
 
         $subscriber = new CustomerChangeSubscriber($failingService, $requestStack, $logger);
 
-        $em = new EntityManager();
         $customer = new Customer();
         $customer->setId(20);
         $customer->setEmail('before@example.com');
-        $em->persist($customer);
-        $em->getUnitOfWork()->takeSnapshot();
-
         $customer->setEmail('after@example.com');
-        $em->flush();
 
-        $subscriber->onFlush(new OnFlushEventArgs($em));
-        $subscriber->postFlush(new PostFlushEventArgs($em));
+        $uow = $this->createMock(UnitOfWork::class);
+        $uow->method('getScheduledEntityUpdates')->willReturn([$customer]);
+        $uow->method('getEntityChangeSet')->willReturn(['email' => ['before@example.com', 'after@example.com']]);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getUnitOfWork')->willReturn($uow);
+
+        $onFlushArgs = $this->createMock(OnFlushEventArgs::class);
+        $onFlushArgs->method('getEntityManager')->willReturn($em);
+
+        $postFlushArgs = $this->createMock(PostFlushEventArgs::class);
+        $postFlushArgs->method('getEntityManager')->willReturn($em);
+
+        $subscriber->onFlush($onFlushArgs);
+        $subscriber->postFlush($postFlushArgs);
 
         $errors = $logger->filterByLevel('error');
         $this->assertNotEmpty($errors);
@@ -162,6 +179,11 @@ class CustomerChangeSubscriberTest extends TestCase
 
     public function testMultipleFlushesNotifyAllDetectedChanges(): void
     {
+        $logger = new ArrayLogger();
+        $notificationService = $this->createMock(NotificationService::class);
+        $requestStack = $this->createMock(RequestStack::class);
+        $subscriber = new CustomerChangeSubscriber($notificationService, $requestStack, $logger);
+
         $customer1 = $this->createMock(\Eccube\Entity\Customer::class);
         $customer1->method('getId')->willReturn(1);
         $customer1->method('getEmail')->willReturn('first@example.com');
@@ -176,7 +198,7 @@ class CustomerChangeSubscriberTest extends TestCase
         $diff2 = new Diff();
         $diff2->addChange('email', 'メールアドレス', 'old2@example.com', 'new2@example.com', 'old2@example.com', 'new2@example.com');
 
-        $this->notificationService
+        $notificationService
             ->method('buildDiff')
             ->willReturnOnConsecutiveCalls($diff1, $diff2);
 
@@ -185,7 +207,7 @@ class CustomerChangeSubscriberTest extends TestCase
             [$customer2, $diff2],
         ];
         $callIndex = 0;
-        $this->notificationService
+        $notificationService
             ->expects($this->exactly(2))
             ->method('notify')
             ->with(
@@ -201,7 +223,7 @@ class CustomerChangeSubscriberTest extends TestCase
                 $callIndex++;
             });
 
-        $this->requestStack
+        $requestStack
             ->method('getCurrentRequest')
             ->willReturn(null);
 
@@ -215,8 +237,8 @@ class CustomerChangeSubscriberTest extends TestCase
         $onFlushArgs1 = $this->createMock(\Doctrine\ORM\Event\OnFlushEventArgs::class);
         $onFlushArgs1->method('getEntityManager')->willReturn($em1);
 
-        $this->subscriber->onFlush($onFlushArgs1);
-        $this->subscriber->postFlush($this->createMock(\Doctrine\ORM\Event\PostFlushEventArgs::class));
+        $subscriber->onFlush($onFlushArgs1);
+        $subscriber->postFlush($this->createMock(\Doctrine\ORM\Event\PostFlushEventArgs::class));
 
         // 2 回目の flush（同一リクエスト内）
         $em2 = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
@@ -228,7 +250,7 @@ class CustomerChangeSubscriberTest extends TestCase
         $onFlushArgs2 = $this->createMock(\Doctrine\ORM\Event\OnFlushEventArgs::class);
         $onFlushArgs2->method('getEntityManager')->willReturn($em2);
 
-        $this->subscriber->onFlush($onFlushArgs2);
-        $this->subscriber->postFlush($this->createMock(\Doctrine\ORM\Event\PostFlushEventArgs::class));
+        $subscriber->onFlush($onFlushArgs2);
+        $subscriber->postFlush($this->createMock(\Doctrine\ORM\Event\PostFlushEventArgs::class));
     }
 }

@@ -1,0 +1,3 @@
+customer_change_notify_admin:
+  resource: '@CustomerChangeNotify/Controller/Admin/'
+  type: annotation

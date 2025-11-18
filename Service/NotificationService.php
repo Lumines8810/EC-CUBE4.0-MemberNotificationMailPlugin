@@ -136,11 +136,11 @@ class NotificationService
             $adminSubject = $Config->getAdminSubject();
 
             try {
-                $adminBody = $this->twig->render(
-                    // プラグイン内 Twig (前提として Resource/template/Mail/customer_change_admin_mail.twig が存在)
-                    'CustomerChangeNotify/Mail/customer_change_admin_mail.twig',
-                    $context
-                );
+        $adminBody = $this->twig->render(
+            // プラグイン内 Twig (前提として Resource/template/CustomerChangeNotify/Mail/customer_change_admin_mail.twig が存在)
+            'CustomerChangeNotify/Mail/customer_change_admin_mail.twig',
+            $context
+        );
 
                 $adminMessage = (new Swift_Message($adminSubject))
                     ->setFrom([$fromAddress => $fromName])
@@ -173,10 +173,10 @@ class NotificationService
             $memberSubject = $Config->getMemberSubject();
 
             try {
-                $memberBody = $this->twig->render(
-                    'CustomerChangeNotify/Mail/customer_change_member_mail.twig',
-                    $context
-                );
+        $memberBody = $this->twig->render(
+            'CustomerChangeNotify/Mail/customer_change_member_mail.twig',
+            $context
+        );
 
                 $memberMessage = (new Swift_Message($memberSubject))
                     ->setFrom([$fromAddress => $fromName])

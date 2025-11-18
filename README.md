@@ -176,37 +176,40 @@ bin/console eccube:plugin:uninstall --code=CustomerChangeNotify
 
 ```
 CustomerChangeNotify/
-├── PluginManager.php            # インストール/アップデート処理とスキーマ管理
-├── Nav.php                      # 管理画面メニュー登録
-├── config.yml                   # プラグインメタ情報
-├── composer.json                # 依存定義
+├── PluginManager.php                # インストール/アップデート処理とスキーマ管理
+├── Nav.php                          # 管理画面メニュー登録
+├── build.sh                         # 配布 ZIP 生成スクリプト（ZIPには含めない）
+├── config.yml                       # プラグインメタ情報
+├── composer.json                    # 依存定義
 ├── Controller/
 │   └── Admin/ConfigController.php   # 設定画面コントローラ
 ├── Entity/
-│   └── Config.php               # 設定エンティティ
+│   └── Config.php                   # 設定エンティティ
 ├── Repository/
-│   └── ConfigRepository.php     # 設定取得ロジック
+│   └── ConfigRepository.php         # 設定取得ロジック
 ├── Form/
-│   └── Type/ConfigType.php      # 設定フォーム
+│   └── Type/ConfigType.php          # 設定フォーム
 ├── Service/
-│   ├── NotificationService.php  # メール通知処理
-│   └── DiffBuilder.php          # 差分生成ロジック
+│   ├── Diff.php                     # 差分 DTO
+│   ├── DiffBuilder.php              # 差分生成ロジック
+│   └── NotificationService.php      # メール通知処理
 ├── Event/
 │   └── CustomerChangeSubscriber.php # Doctrine イベント購読
 ├── Resource/
-│   ├── config/services.yaml     # サービス定義
-│   └── template/
-│       ├── admin/config.twig    # 管理画面テンプレート
+│   ├── config/
+│   │   ├── services.yaml            # サービス定義
+│   │   └── routes.yaml              # ルーティング設定
+│   └── template/CustomerChangeNotify/
+│       ├── admin/config.twig        # 管理画面テンプレート
 │       └── Mail/
 │           ├── customer_change_admin_mail.twig
 │           └── customer_change_member_mail.twig
-├── tests/
-│   ├── bootstrap.php
-│   ├── Event/CustomerChangeSubscriberTest.php
-│   └── Service/
-│       ├── DiffBuilderTest.php
-│       └── NotificationServiceTest.php
-└── Resource/template/Mail 他、補助ファイル
+└── tests/
+    ├── bootstrap.php
+    ├── Event/CustomerChangeSubscriberTest.php
+    └── Service/
+        ├── DiffBuilderTest.php
+        └── NotificationServiceTest.php
 ```
 
 ### テストの実行

@@ -24,6 +24,10 @@ class PluginManager extends AbstractPluginManager
     private const LEGACY_TEMPLATE_FILE_MAP = [
         'CustomerChangeNotify/admin' => self::ADMIN_TEMPLATE_FILE,
         'CustomerChangeNotify/member' => self::MEMBER_TEMPLATE_FILE,
+        'CustomerChangeNotify/Mail/customer_change_admin_mail' => self::ADMIN_TEMPLATE_FILE,
+        'CustomerChangeNotify/Mail/customer_change_member_mail' => self::MEMBER_TEMPLATE_FILE,
+        'CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_admin_mail' => self::ADMIN_TEMPLATE_FILE,
+        'CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_member_mail' => self::MEMBER_TEMPLATE_FILE,
     ];
 
     /**
@@ -34,17 +38,9 @@ class PluginManager extends AbstractPluginManager
      */
     public function install(array $meta, ContainerInterface $container)
     {
-        /** @var EntityManagerInterface $em */
-        $em = $container->get('doctrine.orm.entity_manager');
-
-        // Config テーブルを作成
-        $this->createConfigTable($em);
-
-        // 既に作られていないかチェックしつつ MailTemplate を登録
-        $this->createMailTemplate($em, self::ADMIN_TEMPLATE_FILE, '会員情報変更通知（管理者向け）');
-        $this->createMailTemplate($em, self::MEMBER_TEMPLATE_FILE, '会員情報変更通知（会員向け）');
-
-        $em->flush();
+        $em = $this->getEntityManager($container);
+        $this->createSchema($em);
+        $this->createMailTemplates($em);
     }
 
     /**
@@ -55,22 +51,9 @@ class PluginManager extends AbstractPluginManager
      */
     public function uninstall(array $meta, ContainerInterface $container)
     {
-        /** @var EntityManagerInterface $em */
-        $em = $container->get('doctrine.orm.entity_manager');
-        $repo = $em->getRepository(MailTemplate::class);
-
-        foreach ([self::ADMIN_TEMPLATE_FILE, self::MEMBER_TEMPLATE_FILE] as $fileName) {
-            /** @var MailTemplate|null $mt */
-            $mt = $repo->findOneBy(['file_name' => $fileName]);
-            if ($mt) {
-                $em->remove($mt);
-            }
-        }
-
-        // Config テーブルを削除
-        $this->dropConfigTable($em);
-
-        $em->flush();
+        $em = $this->getEntityManager($container);
+        $this->deleteMailTemplates($em);
+        $this->dropSchema($em);
     }
 
     /**
@@ -103,60 +86,82 @@ class PluginManager extends AbstractPluginManager
      */
     public function update(array $meta, ContainerInterface $container)
     {
-        /** @var EntityManagerInterface $em */
-        $em = $container->get('doctrine.orm.entity_manager');
-
-        // 以前のバージョンからアップグレードする際にも Config テーブルが確実に存在するようにする.
-        $this->createConfigTable($em);
-
-        // 旧テンプレートパスを最新の Twig パスへ移行
+        $em = $this->getEntityManager($container);
+        $this->createSchema($em);
         $this->migrateMailTemplateFileNames($em);
+        $this->createMailTemplates($em);
+    }
+
+    private function getEntityManager(ContainerInterface $container): EntityManagerInterface
+    {
+        return $container->get('doctrine.orm.entity_manager');
+    }
+
+    private function createSchema(EntityManagerInterface $em): void
+    {
+        $metadata = $em->getClassMetadata(Config::class);
+        $tool = new SchemaTool($em);
+
+        try {
+            $tool->createSchema([$metadata]);
+        } catch (Throwable $e) {
+            // 既存スキーマがある場合は握りつぶす
+        }
+    }
+
+    private function dropSchema(EntityManagerInterface $em): void
+    {
+        $metadata = $em->getClassMetadata(Config::class);
+        $tool = new SchemaTool($em);
+
+        try {
+            $tool->dropSchema([$metadata]);
+        } catch (Throwable $e) {
+            // 既に削除されていれば何もしない
+        }
+    }
+
+    private function createMailTemplates(EntityManagerInterface $em): void
+    {
+        $repo = $em->getRepository(MailTemplate::class);
+        $definitions = [
+            self::ADMIN_TEMPLATE_FILE => '会員情報変更通知（管理者向け）',
+            self::MEMBER_TEMPLATE_FILE => '会員情報が変更されました',
+        ];
+
+        foreach ($definitions as $file => $name) {
+            if ($repo->findOneBy(['file_name' => $file])) {
+                continue;
+            }
+
+            $template = new MailTemplate();
+            $template->setName($name);
+            $template->setFileName($file);
+            $template->setDelFlg(0);
+            $em->persist($template);
+        }
 
         $em->flush();
     }
 
-    /**
-     * MailTemplate を 1 件作成（重複防止付き）
-     *
-     * @param EntityManagerInterface $em
-     * @param string                 $fileName   テンプレファイル名（Twig のパスと対応）
-     * @param string                 $name       管理画面に表示されるテンプレ名
-     */
-    protected function createMailTemplate(EntityManagerInterface $em, string $fileName, string $name): void
+    private function deleteMailTemplates(EntityManagerInterface $em): void
     {
         $repo = $em->getRepository(MailTemplate::class);
 
-        // 既存チェック
-        /** @var MailTemplate|null $existing */
-        $existing = $repo->findOneBy(['file_name' => $fileName]);
-        if ($existing) {
-            return;
+        foreach ([self::ADMIN_TEMPLATE_FILE, self::MEMBER_TEMPLATE_FILE] as $file) {
+            if ($template = $repo->findOneBy(['file_name' => $file])) {
+                $em->remove($template);
+            }
         }
 
-        $mt = new MailTemplate();
-        $mt->setName($name);
-        $mt->setFileName($fileName);
-        // 初期状態では有効化（必要なら false でも可）
-        $mt->setDelFlg(0);
-
-        $em->persist($mt);
+        $em->flush();
     }
 
-    /**
-     * 旧バージョンで作成された MailTemplate の file_name を Twig の実パスへ移行する.
-     *
-     * このメソッドは以下の動作を行います:
-     *   1. 既存のレガシーなテンプレート（旧 file_name）を新しい file_name へ更新します。
-     *   2. 新しい file_name で既に別のテンプレートが存在する場合は、その重複テンプレートを削除します。
-     *   3. この処理は冪等であり、複数回実行しても安全です。
-     *
-     * @param EntityManagerInterface $em
-     */
-    protected function migrateMailTemplateFileNames(EntityManagerInterface $em): void
+    private function migrateMailTemplateFileNames(EntityManagerInterface $em): void
     {
         $repo = $em->getRepository(MailTemplate::class);
-
-        $em->beginTransaction();
+        $connection = $em->getConnection();
+        $connection->beginTransaction();
 
         try {
             foreach (self::LEGACY_TEMPLATE_FILE_MAP as $legacy => $current) {
@@ -177,46 +182,10 @@ class PluginManager extends AbstractPluginManager
             }
 
             $em->flush();
-            $em->commit();
+            $connection->commit();
         } catch (Throwable $e) {
-            $em->getConnection()->rollback();
+            $connection->rollBack();
             throw $e;
-        }
-    }
-
-    /**
-     * Config テーブルを作成.
-     *
-     * @param EntityManagerInterface $em
-     */
-    protected function createConfigTable(EntityManagerInterface $em): void
-    {
-        $metadata = $em->getClassMetadata(Config::class);
-        $schemaTool = new SchemaTool($em);
-
-        try {
-            // テーブルが存在しない場合のみ作成
-            $schemaTool->createSchema([$metadata]);
-        } catch (\Exception $e) {
-            // テーブルが既に存在する場合は無視
-        }
-    }
-
-    /**
-     * Config テーブルを削除.
-     *
-     * @param EntityManagerInterface $em
-     */
-    protected function dropConfigTable(EntityManagerInterface $em): void
-    {
-        $metadata = $em->getClassMetadata(Config::class);
-        $schemaTool = new SchemaTool($em);
-
-        try {
-            // テーブルを削除
-            $schemaTool->dropSchema([$metadata]);
-        } catch (\Exception $e) {
-            // テーブルが存在しない場合は無視
         }
     }
 }

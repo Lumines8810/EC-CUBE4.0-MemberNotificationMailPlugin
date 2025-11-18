@@ -1,26 +1,29 @@
-# macOS
+# Operating systems
 .DS_Store
+Thumbs.db
 .AppleDouble
 .LSOverride
 
-# IDE
+# IDE / tooling
 .idea/
 .vscode/
 *.swp
 *.swo
+*.iml
 *~
 
 # Composer
 /vendor/
-composer.lock
+/composer.lock
 
-# PHPUnit
-/phpunit.xml.dist
+# PHPUnit / coverage
 /.phpunit.result.cache
 /coverage/
+
+# Build artifacts
 /build/
 
-# Temporary files
+# Misc
 *.tmp
 *.bak
 *.log

@@ -1,37 +1,22 @@
 services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: false
+
+  Plugin\CustomerChangeNotify\:
+    resource: '../../*'
+    exclude: '../../{tests,Resource,.git,.gitignore,build,.claude,AGENTS.md,CLAUDE.md}'
+
+  Plugin\CustomerChangeNotify\Controller\Admin\ConfigController:
+    public: true
+    tags: ['controller.service_arguments']
+
   Plugin\CustomerChangeNotify\Event\CustomerChangeSubscriber:
-    class: Plugin\CustomerChangeNotify\Event\CustomerChangeSubscriber
-    arguments:
-      - '@Plugin\CustomerChangeNotify\Service\NotificationService'
-      - '@request_stack'
-      - '@logger'
     tags:
       - { name: doctrine.event_subscriber, connection: default }
 
   Plugin\CustomerChangeNotify\Service\DiffBuilder:
-    class: Plugin\CustomerChangeNotify\Service\DiffBuilder
+    autowire: true
     arguments:
-      - ['name01', 'name02', 'kana01', 'kana02', 'email', 'tel01', 'tel02', 'tel03', 'zip01', 'zip02', 'addr01', 'addr02']
-
-  Plugin\CustomerChangeNotify\Repository\ConfigRepository:
-    class: Plugin\CustomerChangeNotify\Repository\ConfigRepository
-    arguments:
-      - '@doctrine'
-
-  Plugin\CustomerChangeNotify\Service\NotificationService:
-    class: Plugin\CustomerChangeNotify\Service\NotificationService
-    arguments:
-      - '@mailer'
-      - '@twig'
-      - '@Eccube\Repository\BaseInfoRepository'
-      - '@Plugin\CustomerChangeNotify\Repository\ConfigRepository'
-      - '@Plugin\CustomerChangeNotify\Service\DiffBuilder'
-      - '@logger'
-
-  Plugin\CustomerChangeNotify\Controller\Admin\ConfigController:
-    class: Plugin\CustomerChangeNotify\Controller\Admin\ConfigController
-    arguments:
-      - '@Plugin\CustomerChangeNotify\Repository\ConfigRepository'
-    public: true
-    tags:
-      - { name: controller.service_arguments }
+      $watchFields: ['name01', 'name02', 'kana01', 'kana02', 'email', 'tel01', 'tel02', 'tel03', 'zip01', 'zip02', 'addr01', 'addr02']

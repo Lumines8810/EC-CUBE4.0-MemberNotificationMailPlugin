@@ -5,39 +5,6 @@ namespace Plugin\CustomerChangeNotify\Service;
 use Eccube\Entity\Customer;
 
 /**
- * 差分を保持するシンプルな DTO.
- */
-class Diff
-{
-    /**
-     * @var array<string, array{field: string, label: string, old: mixed, new: mixed, old_formatted: string, new_formatted: string}>
-     */
-    private $changes = [];
-
-    public function addChange(string $field, string $label, $old, $new, string $oldFormatted, string $newFormatted): void
-    {
-        $this->changes[$field] = [
-            'field'         => $field,
-            'label'         => $label,
-            'old'           => $old,
-            'new'           => $new,
-            'old_formatted' => $oldFormatted,
-            'new_formatted' => $newFormatted,
-        ];
-    }
-
-    public function getChanges(): array
-    {
-        return $this->changes;
-    }
-
-    public function isEmpty(): bool
-    {
-        return empty($this->changes);
-    }
-}
-
-/**
  * Doctrine の変更セットから通知対象の差分だけ抽出するビルダ.
  */
 class DiffBuilder

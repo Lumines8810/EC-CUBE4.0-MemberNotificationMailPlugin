@@ -8,20 +8,15 @@ use Plugin\CustomerChangeNotify\Service\Diff;
 use Plugin\CustomerChangeNotify\Service\DiffBuilder;
 use Plugin\CustomerChangeNotify\Service\NotificationService;
 use Plugin\CustomerChangeNotify\Tests\Fixtures\Logger\ArrayLogger;
-use Plugin\CustomerChangeNotify\Tests\Fixtures\Repository\BaseInfoRepositoryStub;
-use Plugin\CustomerChangeNotify\Tests\Fixtures\Repository\ConfigRepositoryStub;
 use Swift_Mailer;
 use Swift_Message;
 use Swift_Transport_CapturingTransport;
-use Twig_Environment;
-use Twig_Loader_Filesystem;
+use Swift_Mime_SimpleMessage;
+use Twig\Environment;
+use Twig\Loader\FilesystemLoader;
 use Eccube\Entity\BaseInfo;
 use Eccube\Entity\Customer;
 use Symfony\Component\HttpFoundation\Request;
-
-require_once __DIR__ . '/../../Service/NotificationService.php';
-require_once __DIR__ . '/../../Service/DiffBuilder.php';
-require_once __DIR__ . '/../../Service/Diff.php';
 
 class NotificationServiceTest extends TestCase
 {
@@ -48,17 +43,23 @@ class NotificationServiceTest extends TestCase
         $this->transport = new Swift_Transport_CapturingTransport();
         $mailer = new Swift_Mailer($this->transport);
 
-        $loader = new Twig_Loader_Filesystem([__DIR__ . '/../../Resource/template']);
-        $twig = new Twig_Environment($loader);
+        $loader = new FilesystemLoader([__DIR__ . '/../../Resource/template']);
+        $twig = new Environment($loader);
 
         $diffBuilder = new DiffBuilder(['email', 'name01', 'name02']);
         $this->logger = new ArrayLogger();
 
+        $baseInfoRepository = $this->createMock(\Eccube\Repository\BaseInfoRepository::class);
+        $baseInfoRepository->method('get')->willReturn($baseInfo);
+
+        $configRepository = $this->createMock(\Plugin\CustomerChangeNotify\Repository\ConfigRepository::class);
+        $configRepository->method('get')->willReturn($config);
+
         $this->service = new NotificationService(
             $mailer,
             $twig,
-            new BaseInfoRepositoryStub($baseInfo),
-            new ConfigRepositoryStub($config),
+            $baseInfoRepository,
+            $configRepository,
             $diffBuilder,
             $this->logger
         );
@@ -117,9 +118,14 @@ class NotificationServiceTest extends TestCase
         $diff->addChange('email', 'メールアドレス', 'old@example.com', 'member@example.com', 'old@example.com', 'member@example.com');
 
         $throwingTransport = new class extends \Swift_Transport_AbstractTransport {
-            public function send(Swift_Message $message, &$failedRecipients = null)
+            public function send(Swift_Mime_SimpleMessage $message, &$failedRecipients = null): int
             {
                 throw new \RuntimeException('transport failed');
+            }
+
+            public function ping(): bool
+            {
+                return false;
             }
         };
 

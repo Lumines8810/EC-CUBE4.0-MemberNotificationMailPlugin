@@ -15,40 +15,20 @@ use Symfony\Component\Routing\Annotation\Route;
 class ConfigController extends AbstractController
 {
     /**
-     * @var ConfigRepository
-     */
-    protected $configRepository;
-
-    /**
-     * ConfigController constructor.
-     *
-     * @param ConfigRepository $configRepository
-     */
-    public function __construct(ConfigRepository $configRepository)
-    {
-        $this->configRepository = $configRepository;
-    }
-
-    /**
      * 設定画面.
      *
      * @Route("/%eccube_admin_route%/customer_change_notify/config", name="customer_change_notify_admin_config")
-     * @Template("@CustomerChangeNotify/admin/config.twig")
-     *
-     * @param Request $request
-     *
-     * @return array
+     * @Template("@CustomerChangeNotify/CustomerChangeNotify/admin/config.twig")
      */
-    public function index(Request $request)
+    public function index(Request $request, ConfigRepository $configRepository)
     {
-        $Config = $this->configRepository->get();
+        $Config = $configRepository->get();
 
         $form = $this->createForm(ConfigType::class, $Config);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             $Config = $form->getData();
-
             $this->entityManager->persist($Config);
             $this->entityManager->flush();
 

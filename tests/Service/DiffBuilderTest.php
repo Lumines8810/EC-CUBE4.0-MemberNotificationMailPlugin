@@ -7,14 +7,6 @@ use DateTimeZone;
 use PHPUnit\Framework\TestCase;
 use Plugin\CustomerChangeNotify\Service\DiffBuilder;
 
-require_once __DIR__ . '/../../Service/DiffBuilder.php';
-
-class CustomerStub
-{
-}
-
-class_alias(CustomerStub::class, 'Eccube\\Entity\\Customer');
-
 class DiffBuilderTest extends TestCase
 {
     public function testDetectsTypeDifferenceStrictly(): void

@@ -114,7 +114,7 @@ The plugin provides a web-based configuration interface accessible from the EC-C
 - `Repository/ConfigRepository.php`: Repository with `get()` helper method
 - `Form/Type/ConfigType.php`: Symfony form with validation
 - `Controller/Admin/ConfigController.php`: Admin controller with route `customer_change_notify_admin_config`
-- `Resource/template/admin/config.twig`: Admin UI template
+- `Resource/template/CustomerChangeNotify/admin/config.twig`: Admin UI template
 - `Nav.php`: Registers menu item in admin navigation
 
 Configuration is stored in the `plg_customer_change_notify_config` table and automatically created/destroyed during install/uninstall.
@@ -214,7 +214,7 @@ To monitor additional Customer fields:
 ### Mail Template Registration
 
 - Mail templates are registered as `MailTemplate` entities during plugin installation (Plugin.php:32-33)
-- Template file names must match: `CustomerChangeNotify/admin` and `CustomerChangeNotify/member`
+- Template file names must match: `CustomerChangeNotify/Mail/customer_change_admin_mail` and `CustomerChangeNotify/Mail/customer_change_member_mail`
 - Templates are removed on plugin uninstall (Plugin.php:50-56)
 
 ### Normalization Rules

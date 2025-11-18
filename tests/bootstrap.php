@@ -4,7 +4,12 @@
  * PHPUnit bootstrap file for CustomerChangeNotify plugin
  */
 
-// テストのための基本的なセットアップ
+$autoload = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($autoload)) {
+    require_once $autoload;
+}
+
+// テストのための基本的なセットアップ（Composer に存在しない簡易スタブ）
 spl_autoload_register(function ($class): void {
     $prefixes = [
         'Plugin\\CustomerChangeNotify\\' => __DIR__ . '/../',
