@@ -5,7 +5,8 @@
       "WebFetch(domain:github.com)",
       "WebSearch",
       "Bash(vendor/bin/phpunit:*)",
-      "Bash(php --version:*)"
+      "Bash(php --version:*)",
+      "WebFetch(domain:zenn.dev)"
     ],
     "deny": [],
     "ask": []

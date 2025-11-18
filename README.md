@@ -120,14 +120,25 @@ bin/console cache:clear --no-warmup
 - `zip01`, `zip02` (郵便番号)
 - `addr01`, `addr02` (住所)
 
-監視対象フィールドを変更する場合は、`Resource/config/services.yaml` を編集してください。
+監視対象フィールドやフィールドラベルを変更する場合は、`Resource/config/services.yaml` を編集してください。
 
 ```yaml
 Plugin\CustomerChangeNotify\Service\DiffBuilder:
-  class: Plugin\CustomerChangeNotify\Service\DiffBuilder
+  autowire: true
   arguments:
-    - ['name01', 'name02', 'email']  # ← 監視したいフィールドを指定
+    # 監視したいフィールドを指定
+    $watchFields: ['name01', 'name02', 'email']
+    # フィールドのラベルをカスタマイズ（任意、デフォルト値があります）
+    $fieldLabels:
+      name01: '姓'
+      name02: '名'
+      email: 'メールアドレス'
 ```
+
+**注意:**
+- `$watchFields`: 変更を監視するフィールド名のリスト
+- `$fieldLabels`: 通知メールに表示されるフィールドのラベル（省略可能）
+- `$fieldLabels` を省略した場合は、デフォルトのラベルが使用されます
 
 ## トラブルシューティング
 

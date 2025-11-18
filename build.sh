@@ -24,6 +24,21 @@ rsync -a \
   --exclude='phpunit.xml' \
   --exclude='phpunit.xml.dist' \
   --exclude='coverage' \
+  --exclude='build.sh' \
+  --exclude='.DS_Store' \
+  --exclude='Thumbs.db' \
+  --exclude='.AppleDouble' \
+  --exclude='.LSOverride' \
+  --exclude='*.swp' \
+  --exclude='*.swo' \
+  --exclude='*~' \
+  --exclude='*.tmp' \
+  --exclude='*.bak' \
+  --exclude='*.log' \
+  --exclude='.phpunit.result.cache' \
+  --exclude='node_modules' \
+  --exclude='package.json' \
+  --exclude='package-lock.json' \
   "${ROOT_DIR}/" "${DIST_DIR}/"
 
 (

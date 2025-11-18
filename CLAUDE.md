@@ -17,20 +17,23 @@ The plugin uses a Doctrine event subscriber pattern with deferred notification:
    - `postFlush`: Sends all queued notifications after transaction commits
 
 2. **DiffBuilder** (Service/DiffBuilder.php) extracts monitored field changes from Doctrine changesets:
-   - Watches specific fields configured in services.yaml (name, email, phone, address, etc.)
+   - Watches specific fields configured in services.yaml via `$watchFields` parameter (name, email, phone, address, etc.)
+   - Uses field labels configured via `$fieldLabels` parameter for human-readable change descriptions
    - Normalizes values before comparison (trims strings, converts DateTime to ATOM format)
-   - Returns a `Diff` object containing only meaningful changes
+   - Returns a `Diff` object containing only meaningful changes with formatted labels
 
 3. **NotificationService** (Service/NotificationService.php) sends emails:
-   - Renders Twig templates for admin and member notifications
+   - Renders Twig templates for admin and member notifications using the `sendMail()` helper method
    - Uses SwiftMailer to send to both administrator and customer
-   - Admin email destination is configurable via `customer_change_notify.admin_to` parameter
+   - Admin email destination is configurable via database Config entity
+   - Implements comprehensive error handling with separate try-catch blocks for each email type
 
 ### Key Design Patterns
 
 - **Two-phase notification**: Changes are queued in `onFlush` and sent in `postFlush` to ensure DB transaction success before sending emails
 - **Strict type comparison**: The DiffBuilder uses strict equality after normalization to detect real changes (e.g., `1` vs `'1'` is considered different)
-- **Configurable monitoring**: Watched fields are injected via dependency injection (see services.yaml line 13)
+- **Configurable monitoring**: Watched fields and labels are injected via dependency injection (see services.yaml lines 22-35)
+- **Refactored helpers**: Common operations extracted into private methods (`sendMail()`, `resetPendingNotifications()`) for code reuse and maintainability
 
 ## Testing
 
@@ -207,15 +210,28 @@ Template variables available:
 
 To monitor additional Customer fields:
 
-1. Add field name to the array in `Resource/config/services.yaml:13`
-2. Add corresponding label to `DiffBuilder::$fieldLabels` in `Service/DiffBuilder.php:61-74`
-3. If the field has custom formatting needs, update `DiffBuilder::formatValue()` or `DiffBuilder::normalize()`
+1. Add field name to `$watchFields` array in `Resource/config/services.yaml:22`
+   ```yaml
+   $watchFields: ['name01', 'name02', 'email', 'new_field']
+   ```
+
+2. Add corresponding label to `$fieldLabels` mapping in `Resource/config/services.yaml:23-35`
+   ```yaml
+   $fieldLabels:
+     name01: '姓'
+     # ... existing labels ...
+     new_field: 'New Field Label'
+   ```
+
+   Alternatively, you can add the label to `DEFAULT_FIELD_LABELS` constant in `Service/DiffBuilder.php:22-35` if you want it as a default.
+
+3. If the field has custom formatting needs, update `DiffBuilder::formatValue()` or `DiffBuilder::normalize()` methods
 
 ### Mail Template Registration
 
-- Mail templates are registered as `MailTemplate` entities during plugin installation (Plugin.php:32-33)
+- Mail templates are registered as `MailTemplate` entities during plugin installation (PluginManager.php)
 - Template file names must match: `CustomerChangeNotify/Mail/customer_change_admin_mail` and `CustomerChangeNotify/Mail/customer_change_member_mail`
-- Templates are removed on plugin uninstall (Plugin.php:50-56)
+- Templates are removed on plugin uninstall (PluginManager.php)
 
 ### Normalization Rules
 
@@ -225,3 +241,27 @@ The DiffBuilder normalizes values before comparison:
 - Other types: Used as-is for strict equality check
 
 This ensures that `'Alice'` and `' Alice  '` are treated as the same value, preventing false-positive notifications.
+
+### Code Organization and Helper Methods
+
+Recent refactoring has improved code maintainability by extracting common operations into reusable helper methods:
+
+**NotificationService::sendMail()** (Service/NotificationService.php:165-201)
+- Private helper method that consolidates email sending logic
+- Parameters: template path, subject, recipient, context, label, from address, from name
+- Handles Twig rendering, SwiftMailer message creation, sending, and logging
+- Eliminates code duplication between admin and member email sending
+- Provides consistent error handling and logging for all email types
+
+**CustomerChangeSubscriber::resetPendingNotifications()** (Event/CustomerChangeSubscriber.php:163-175)
+- Private helper method that clears the notification queue
+- Called from `onFlush()`, `postFlush()`, and `onClear()` events
+- Accepts a `$reason` parameter for debugging (identifies which event triggered the reset)
+- Provides consistent logging when queue is cleared
+- Ensures stale notifications from failed transactions are not delivered
+
+These refactorings improve:
+- **Code reusability**: Common logic extracted to single location
+- **Maintainability**: Changes to email sending or queue management only need to be made once
+- **Testability**: Helper methods are easier to test in isolation
+- **Logging consistency**: All queue resets and email operations use the same logging format
