@@ -8,6 +8,8 @@
 {% form_theme form '@admin/Form/bootstrap_4_horizontal_layout.html.twig' %}
 
 {% block main %}
+    {{ include('@admin/alert.twig') }}
+
     <form name="form1" role="form" id="form1" method="post" action="">
         {{ form_widget(form._token) }}
 
