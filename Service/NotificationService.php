@@ -18,6 +18,9 @@ use Twig\Environment;
  */
 class NotificationService
 {
+    private const ADMIN_TEMPLATE = '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_admin_mail.twig';
+    private const MEMBER_TEMPLATE = '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_member_mail.twig';
+
     /**
      * @var Swift_Mailer
      */
@@ -131,7 +134,7 @@ class NotificationService
             ]);
 
             $this->sendMail(
-                'CustomerChangeNotify/Mail/customer_change_admin_mail.twig',
+                self::ADMIN_TEMPLATE,
                 $Config->getAdminSubject(),
                 $adminTo,
                 $context,
@@ -141,7 +144,7 @@ class NotificationService
             );
 
             $this->sendMail(
-                'CustomerChangeNotify/Mail/customer_change_member_mail.twig',
+                self::MEMBER_TEMPLATE,
                 $Config->getMemberSubject(),
                 $customer->getEmail(),
                 $context,
