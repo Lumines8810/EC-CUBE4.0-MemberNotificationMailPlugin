@@ -2,7 +2,7 @@
 
 namespace Plugin\CustomerChangeNotify\Repository;
 
-use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\Common\Persistence\ManagerRegistry;
 use Eccube\Repository\AbstractRepository;
 use Plugin\CustomerChangeNotify\Entity\Config;
 
