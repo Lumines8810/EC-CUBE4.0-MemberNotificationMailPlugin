@@ -131,7 +131,7 @@ class NotificationService
             ]);
 
             $this->sendMail(
-                'CustomerChangeNotify/Mail/customer_change_admin_mail.twig',
+                '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_admin_mail.twig',
                 $Config->getAdminSubject(),
                 $adminTo,
                 $context,
@@ -141,7 +141,7 @@ class NotificationService
             );
 
             $this->sendMail(
-                'CustomerChangeNotify/Mail/customer_change_member_mail.twig',
+                '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_member_mail.twig',
                 $Config->getMemberSubject(),
                 $customer->getEmail(),
                 $context,
