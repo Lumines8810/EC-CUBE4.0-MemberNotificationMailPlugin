@@ -57,8 +57,8 @@ class NotificationServiceTest extends TestCase
         $this->diffBuilder = new DiffBuilder(['email', 'name01', 'name02']);
 
         $loader = new ArrayLoader([
-            'CustomerChangeNotify/Mail/customer_change_admin_mail.twig' => '管理者向け: {{ Customer.getName01() }} {{ Customer.getName02() }} {{ diff|length }}件',
-            'CustomerChangeNotify/Mail/customer_change_member_mail.twig' => '会員向け:{% for change in diff %}- {{ change.label }} が変更されました。{% endfor %}',
+            '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_admin_mail.twig' => '管理者向け: {{ Customer.getName01() }} {{ Customer.getName02() }} {{ diff|length }}件',
+            '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_member_mail.twig' => '会員向け:{% for change in diff %}- {{ change.label }} が変更されました。{% endfor %}',
         ]);
         $this->twig = new Environment($loader);
 
