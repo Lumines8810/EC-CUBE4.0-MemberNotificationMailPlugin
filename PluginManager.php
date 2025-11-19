@@ -137,7 +137,7 @@ class PluginManager extends AbstractPluginManager
             $template = new MailTemplate();
             $template->setName($name);
             $template->setFileName($file);
-            $template->setDelFlg(0);
+            // EC-CUBE 4.0 では setDelFlg() は不要（del_flg フィールドが廃止されたため）
             $em->persist($template);
         }
 

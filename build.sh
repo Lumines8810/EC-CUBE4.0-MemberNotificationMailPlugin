@@ -25,6 +25,7 @@ rsync -a \
   --exclude='phpunit.xml.dist' \
   --exclude='coverage' \
   --exclude='build.sh' \
+  --exclude='Plugin.php' \
   --exclude='.DS_Store' \
   --exclude='Thumbs.db' \
   --exclude='.AppleDouble' \
@@ -42,8 +43,8 @@ rsync -a \
   "${ROOT_DIR}/" "${DIST_DIR}/"
 
 (
-  cd "${BUILD_DIR}"
-  zip -r "${PLUGIN_CODE}.zip" "${PLUGIN_CODE}" >/dev/null
+  cd "${DIST_DIR}"
+  zip -r "../${PLUGIN_CODE}.zip" . >/dev/null
 )
 
 echo "✅ Build completed: ${BUILD_DIR}/${PLUGIN_CODE}.zip"

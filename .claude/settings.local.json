@@ -6,7 +6,10 @@
       "WebSearch",
       "Bash(vendor/bin/phpunit:*)",
       "Bash(php --version:*)",
-      "WebFetch(domain:zenn.dev)"
+      "WebFetch(domain:zenn.dev)",
+      "WebFetch(domain:qiita.com)",
+      "WebFetch(domain:umebius.com)",
+      "WebFetch(domain:ec4.umebius.com)"
     ],
     "deny": [],
     "ask": []

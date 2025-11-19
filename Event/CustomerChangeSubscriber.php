@@ -10,7 +10,6 @@ use Doctrine\ORM\Events;
 use Eccube\Entity\Customer;
 use Plugin\CustomerChangeNotify\Service\NotificationService;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Customer エンティティの更新を監視して差分を通知する Doctrine イベントサブスクライバ.
@@ -21,11 +20,6 @@ class CustomerChangeSubscriber implements EventSubscriber
      * @var NotificationService
      */
     private $notificationService;
-
-    /**
-     * @var RequestStack
-     */
-    private $requestStack;
 
     /**
      * @var LoggerInterface
@@ -39,16 +33,13 @@ class CustomerChangeSubscriber implements EventSubscriber
 
     /**
      * @param NotificationService $notificationService
-     * @param RequestStack        $requestStack
      * @param LoggerInterface     $logger
      */
     public function __construct(
         NotificationService $notificationService,
-        RequestStack $requestStack,
         LoggerInterface $logger
     ) {
         $this->notificationService = $notificationService;
-        $this->requestStack = $requestStack;
         $this->logger = $logger;
     }
 
@@ -79,7 +70,8 @@ class CustomerChangeSubscriber implements EventSubscriber
         // so rolled-back changes are not delivered on a later successful flush.
         $this->resetPendingNotifications('onFlush');
 
-        $request = $this->requestStack->getCurrentRequest();
+        // Request オブジェクトは常に null を渡す（CLI環境でも動作するため）
+        $request = null;
 
         foreach ($uow->getScheduledEntityUpdates() as $entity) {
             if (!$entity instanceof Customer) {

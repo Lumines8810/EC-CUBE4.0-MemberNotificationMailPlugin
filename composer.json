@@ -1,12 +1,13 @@
 {
     "name": "ec-cube/customer-change-notify",
     "version": "1.0.0",
-    "description": "会員情報が変更された際に、管理者・会員へメール通知するプラグインです。",
+    "description": "会員情報変更メール通知プラグイン",
     "type": "eccube-plugin",
     "license": "Apache-2.0",
     "authors": [
         {
-            "name": "CustomerChangeNotify Plugin Authors"
+            "name": "Lumines",
+            "email": "admin@lumines.co.jp"
         }
     ],
     "require": {

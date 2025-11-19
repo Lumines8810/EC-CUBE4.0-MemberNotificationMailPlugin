@@ -18,7 +18,6 @@ use Eccube\Entity\Customer;
 use Swift_Mailer;
 use Swift_Transport_CapturingTransport;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\RequestStack;
 use Twig\Environment;
 use Twig\Loader\FilesystemLoader;
 
@@ -63,9 +62,7 @@ class CustomerChangeSubscriberTest extends TestCase
         $serviceLogger = new ArrayLogger();
         [$notificationService, $transport] = $this->createNotificationService($serviceLogger);
 
-        $requestStack = new RequestStack();
-        $requestStack->push(new Request());
-        $subscriber = new CustomerChangeSubscriber($notificationService, $requestStack, $logger);
+        $subscriber = new CustomerChangeSubscriber($notificationService, $logger);
 
         $customer = new Customer();
         $customer->setId(10);
@@ -105,9 +102,6 @@ class CustomerChangeSubscriberTest extends TestCase
     public function testPostFlushLogsErrorWhenNotifyFails(): void
     {
         $logger = new ArrayLogger();
-        $requestStack = new RequestStack();
-        $requestStack->push(new Request());
-
         $diff = new Diff();
         $diff->addChange('email', 'メールアドレス', 'before@example.com', 'after@example.com', 'before@example.com', 'after@example.com');
 
@@ -119,7 +113,7 @@ class CustomerChangeSubscriberTest extends TestCase
             ->method('notify')
             ->willThrowException(new \RuntimeException('failure'));
 
-        $subscriber = new CustomerChangeSubscriber($notificationService, $requestStack, $logger);
+        $subscriber = new CustomerChangeSubscriber($notificationService, $logger);
 
         $customer = new Customer();
         $customer->setId(20);
@@ -151,8 +145,7 @@ class CustomerChangeSubscriberTest extends TestCase
     {
         $logger = new ArrayLogger();
         $notificationService = $this->createMock(NotificationService::class);
-        $requestStack = $this->createMock(RequestStack::class);
-        $subscriber = new CustomerChangeSubscriber($notificationService, $requestStack, $logger);
+        $subscriber = new CustomerChangeSubscriber($notificationService, $logger);
 
         $customer1 = $this->createMock(\Eccube\Entity\Customer::class);
         $customer1->method('getId')->willReturn(1);
@@ -192,10 +185,6 @@ class CustomerChangeSubscriberTest extends TestCase
             ->willReturnCallback(function () use (&$callIndex) {
                 $callIndex++;
             });
-
-        $requestStack
-            ->method('getCurrentRequest')
-            ->willReturn(null);
 
         // 1 回目の flush
         $em1 = $this->createMock(\Doctrine\ORM\EntityManagerInterface::class);
