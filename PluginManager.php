@@ -15,10 +15,10 @@ use Throwable;
 class PluginManager extends AbstractPluginManager
 {
     /** @var string 管理者向けメールテンプレの file_name */
-    const ADMIN_TEMPLATE_FILE = 'CustomerChangeNotify/Mail/customer_change_admin_mail';
+    const ADMIN_TEMPLATE_FILE = '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_admin_mail.twig';
 
     /** @var string 会員向けメールテンプレの file_name */
-    const MEMBER_TEMPLATE_FILE = 'CustomerChangeNotify/Mail/customer_change_member_mail';
+    const MEMBER_TEMPLATE_FILE = '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_member_mail.twig';
 
     /** @var array<string, string> 旧テンプレートパスのマッピング */
     private const LEGACY_TEMPLATE_FILE_MAP = [
