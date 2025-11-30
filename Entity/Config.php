@@ -32,22 +32,22 @@ class Config extends AbstractEntity
     private $admin_to;
 
     /**
-     * 管理者向けメール件名.
+     * 管理者向けメール件名（互換用。実際の件名は MailTemplate で管理）.
      *
-     * @var string
+     * @var string|null
      *
-     * @ORM\Column(name="admin_subject", type="string", length=255, nullable=false)
+     * @ORM\Column(name="admin_subject", type="string", length=255, nullable=true)
      */
-    private $admin_subject = '会員情報変更通知（管理者向け）';
+    private $admin_subject;
 
     /**
-     * 会員向けメール件名.
+     * 会員向けメール件名（互換用。実際の件名は MailTemplate で管理）.
      *
-     * @var string
+     * @var string|null
      *
-     * @ORM\Column(name="member_subject", type="string", length=255, nullable=false)
+     * @ORM\Column(name="member_subject", type="string", length=255, nullable=true)
      */
-    private $member_subject = '会員情報が変更されました';
+    private $member_subject;
 
     /**
      * @return int
@@ -77,40 +77,24 @@ class Config extends AbstractEntity
         return $this;
     }
 
-    /**
-     * @return string
-     */
-    public function getAdminSubject()
+    public function getAdminSubject(): ?string
     {
         return $this->admin_subject;
     }
 
-    /**
-     * @param string $admin_subject
-     *
-     * @return $this
-     */
-    public function setAdminSubject($admin_subject)
+    public function setAdminSubject(?string $admin_subject)
     {
         $this->admin_subject = $admin_subject;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
-    public function getMemberSubject()
+    public function getMemberSubject(): ?string
     {
         return $this->member_subject;
     }
 
-    /**
-     * @param string $member_subject
-     *
-     * @return $this
-     */
-    public function setMemberSubject($member_subject)
+    public function setMemberSubject(?string $member_subject)
     {
         $this->member_subject = $member_subject;
 

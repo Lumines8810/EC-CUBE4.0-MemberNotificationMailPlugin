@@ -36,7 +36,7 @@ class CustomerChangeSubscriberTest extends TestCase
         $config->setAdminTo('admin@example.com');
 
         $transport = $transport ?: new Swift_Transport_CapturingTransport();
-        $loader = new FilesystemLoader([__DIR__ . '/../../Resource/template']);
+        $loader = new FilesystemLoader([__DIR__ . '/../../']);
 
         $baseInfoRepository = $this->createMock(\Eccube\Repository\BaseInfoRepository::class);
         $baseInfoRepository->method('get')->willReturn($baseInfo);

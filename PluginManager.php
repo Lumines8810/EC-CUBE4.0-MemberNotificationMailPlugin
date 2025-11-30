@@ -7,6 +7,7 @@ use Eccube\Entity\MailTemplate;
 use Eccube\Plugin\AbstractPluginManager;
 use Plugin\CustomerChangeNotify\Entity\Config;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\Filesystem\Filesystem;
 use Throwable;
 
 /**
@@ -15,19 +16,21 @@ use Throwable;
 class PluginManager extends AbstractPluginManager
 {
     /** @var string 管理者向けメールテンプレの file_name */
-    const ADMIN_TEMPLATE_FILE = '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_admin_mail.twig';
+    const ADMIN_TEMPLATE_FILE = 'CustomerChangeNotify/Mail/customer_change_admin_mail.twig';
 
     /** @var string 会員向けメールテンプレの file_name */
-    const MEMBER_TEMPLATE_FILE = '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_member_mail.twig';
+    const MEMBER_TEMPLATE_FILE = 'CustomerChangeNotify/Mail/customer_change_member_mail.twig';
 
     /** @var array<string, string> 旧テンプレートパスのマッピング */
     private const LEGACY_TEMPLATE_FILE_MAP = [
         'CustomerChangeNotify/admin' => self::ADMIN_TEMPLATE_FILE,
         'CustomerChangeNotify/member' => self::MEMBER_TEMPLATE_FILE,
+        '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_admin_mail' => self::ADMIN_TEMPLATE_FILE,
+        '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_admin_mail.twig' => self::ADMIN_TEMPLATE_FILE,
+        '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_member_mail' => self::MEMBER_TEMPLATE_FILE,
+        '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_member_mail.twig' => self::MEMBER_TEMPLATE_FILE,
         'CustomerChangeNotify/Mail/customer_change_admin_mail' => self::ADMIN_TEMPLATE_FILE,
         'CustomerChangeNotify/Mail/customer_change_member_mail' => self::MEMBER_TEMPLATE_FILE,
-        'CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_admin_mail' => self::ADMIN_TEMPLATE_FILE,
-        'CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_member_mail' => self::MEMBER_TEMPLATE_FILE,
     ];
 
     /**
@@ -40,7 +43,9 @@ class PluginManager extends AbstractPluginManager
     {
         $em = $this->getEntityManager($container);
         $this->createSchema($em);
+        $this->createInitialConfig($em);
         $this->createMailTemplates($em);
+        $this->publishMailTemplates($container);
     }
 
     /**
@@ -90,6 +95,7 @@ class PluginManager extends AbstractPluginManager
         $this->createSchema($em);
         $this->migrateMailTemplateFileNames($em);
         $this->createMailTemplates($em);
+        $this->publishMailTemplates($container);
     }
 
     private function getEntityManager(ContainerInterface $container): EntityManagerInterface
@@ -137,7 +143,7 @@ class PluginManager extends AbstractPluginManager
             $template = new MailTemplate();
             $template->setName($name);
             $template->setFileName($file);
-            // EC-CUBE 4.0 では setDelFlg() は不要（del_flg フィールドが廃止されたため）
+            $template->setMailSubject($file === self::ADMIN_TEMPLATE_FILE ? '会員情報変更通知（管理者向け）' : '会員情報が変更されました');
             $em->persist($template);
         }
 
@@ -186,6 +192,44 @@ class PluginManager extends AbstractPluginManager
         } catch (Throwable $e) {
             $connection->rollBack();
             throw $e;
+        }
+    }
+
+    /**
+     * 初期設定レコードを作成する.
+     *
+     * IMPORTANT: ConfigRepository::get() が postFlush 中に flush() を呼び出すと
+     * Segmentation fault が発生するため、インストール時に必ず Config レコードを作成します。
+     *
+     * @param EntityManagerInterface $em
+     */
+    private function createInitialConfig(EntityManagerInterface $em): void
+    {
+        $repo = $em->getRepository(Config::class);
+        $existingConfig = $repo->find(1);
+
+        if (!$existingConfig) {
+            $config = new Config();
+            // デフォルト値は Entity で設定されている
+            $em->persist($config);
+            $em->flush();
+        }
+    }
+
+    private function publishMailTemplates(ContainerInterface $container): void
+    {
+        $filesystem = new Filesystem();
+        $sourceDir = __DIR__.'/Resource/template/CustomerChangeNotify/Mail';
+        $targetDir = rtrim($container->getParameter('eccube_theme_front_dir'), '/').'/CustomerChangeNotify/Mail';
+
+        $filesystem->mkdir($targetDir);
+
+        foreach (['customer_change_admin_mail.twig', 'customer_change_member_mail.twig'] as $file) {
+            $target = $targetDir.'/'.$file;
+            if ($filesystem->exists($target)) {
+                continue;
+            }
+            $filesystem->copy($sourceDir.'/'.$file, $target);
         }
     }
 }

@@ -33,38 +33,6 @@ class ConfigType extends AbstractType
                     'placeholder' => '例: admin@example.com',
                     'help' => '空欄の場合は店舗設定のメールアドレスが使用されます。',
                 ],
-            ])
-            ->add('admin_subject', TextType::class, [
-                'label' => '管理者向けメール件名',
-                'required' => true,
-                'constraints' => [
-                    new Assert\NotBlank([
-                        'message' => 'メール件名を入力してください。',
-                    ]),
-                    new Assert\Length([
-                        'max' => 255,
-                        'maxMessage' => 'メール件名は{{ limit }}文字以内で入力してください。',
-                    ]),
-                ],
-                'attr' => [
-                    'placeholder' => '例: 会員情報変更通知（管理者向け）',
-                ],
-            ])
-            ->add('member_subject', TextType::class, [
-                'label' => '会員向けメール件名',
-                'required' => true,
-                'constraints' => [
-                    new Assert\NotBlank([
-                        'message' => 'メール件名を入力してください。',
-                    ]),
-                    new Assert\Length([
-                        'max' => 255,
-                        'maxMessage' => 'メール件名は{{ limit }}文字以内で入力してください。',
-                    ]),
-                ],
-                'attr' => [
-                    'placeholder' => '例: 会員情報が変更されました',
-                ],
             ]);
     }
 

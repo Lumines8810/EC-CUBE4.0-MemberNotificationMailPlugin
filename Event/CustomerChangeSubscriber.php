@@ -2,7 +2,6 @@
 
 namespace Plugin\CustomerChangeNotify\Event;
 
-use Doctrine\Common\EventSubscriber;
 use Doctrine\ORM\Event\OnClearEventArgs;
 use Doctrine\ORM\Event\OnFlushEventArgs;
 use Doctrine\ORM\Event\PostFlushEventArgs;
@@ -12,9 +11,12 @@ use Plugin\CustomerChangeNotify\Service\NotificationService;
 use Psr\Log\LoggerInterface;
 
 /**
- * Customer エンティティの更新を監視して差分を通知する Doctrine イベントサブスクライバ.
+ * Customer エンティティの更新を監視して差分を通知するための Doctrine Hook 実装.
+ *
+ * NOTE: EC-CUBE 4.0.3 では Doctrine イベントにフックすると Segmentation fault を
+ * 引き起こすため、このクラスはデフォルトではサービス登録されません。
  */
-class CustomerChangeSubscriber implements EventSubscriber
+class CustomerChangeSubscriber
 {
     /**
      * @var NotificationService

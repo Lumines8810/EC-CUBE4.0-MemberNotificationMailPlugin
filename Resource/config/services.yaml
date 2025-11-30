@@ -4,17 +4,39 @@ services:
     autoconfigure: true
     public: false
 
-  Plugin\CustomerChangeNotify\:
-    resource: '../../*'
-    exclude: '../../{tests,Resource,.git,.gitignore,build,.claude,AGENTS.md,CLAUDE.md}'
+  Plugin\CustomerChangeNotify\Service\:
+    resource: '../../Service'
+
+  Plugin\CustomerChangeNotify\Controller\:
+    resource: '../../Controller'
+    tags: ['controller.service_arguments']
+
+# その他明示的なサービス定義
+  Plugin\CustomerChangeNotify\Repository\ConfigRepository:
+    autowire: true
+    tags: ['doctrine.repository_service']
+
+  # Doctrine 配下のイベントや EventListener は明示的に定義する
 
   Plugin\CustomerChangeNotify\Controller\Admin\ConfigController:
     public: true
     tags: ['controller.service_arguments']
 
-  Plugin\CustomerChangeNotify\Event\CustomerChangeSubscriber:
+  # Doctrine EventSubscriber は EC-CUBE 4.0.3 で Segmentation fault を引き起こすため無効化
+  # Plugin\CustomerChangeNotify\Event\CustomerChangeSubscriber:
+  #   autowire: true
+  #   autoconfigure: false
+  #   tags:
+  #     - { name: doctrine.event_subscriber, connection: default }
+
+  # Symfony EventSubscriber を使用（Segmentation fault 回避）
+  Plugin\CustomerChangeNotify\EventListener\CustomerEditEventListener:
+    autowire: true
+    autoconfigure: false
+    arguments:
+      $logger: '@logger'
     tags:
-      - { name: doctrine.event_subscriber, connection: default }
+      - { name: kernel.event_subscriber }
 
   Plugin\CustomerChangeNotify\Service\DiffBuilder:
     autowire: true
@@ -33,3 +55,7 @@ services:
         zip02: '郵便番号（4桁）'
         addr01: '住所1'
         addr02: '住所2'
+
+  Plugin\CustomerChangeNotify\Repository\ConfigRepository:
+    autowire: true
+    tags: ['doctrine.repository_service']

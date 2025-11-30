@@ -18,8 +18,8 @@ use Twig\Environment;
  */
 class NotificationService
 {
-    private const ADMIN_TEMPLATE = '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_admin_mail.twig';
-    private const MEMBER_TEMPLATE = '@CustomerChangeNotify/CustomerChangeNotify/Mail/customer_change_member_mail.twig';
+    private const ADMIN_TEMPLATE = 'CustomerChangeNotify/Mail/customer_change_admin_mail.twig';
+    private const MEMBER_TEMPLATE = 'CustomerChangeNotify/Mail/customer_change_member_mail.twig';
 
     /**
      * @var Swift_Mailer
@@ -135,7 +135,7 @@ class NotificationService
 
             $this->sendMail(
                 self::ADMIN_TEMPLATE,
-                $Config->getAdminSubject(),
+                $this->resolveSubject($Config->getAdminSubject(), '会員情報変更通知（管理者向け）'),
                 $adminTo,
                 $context,
                 '管理者向けメール',
@@ -145,7 +145,7 @@ class NotificationService
 
             $this->sendMail(
                 self::MEMBER_TEMPLATE,
-                $Config->getMemberSubject(),
+                $this->resolveSubject($Config->getMemberSubject(), '会員情報が変更されました'),
                 $customer->getEmail(),
                 $context,
                 '会員向けメール',
@@ -160,6 +160,13 @@ class NotificationService
             ]);
             // エラーが発生しても、元のトランザクションには影響を与えないようにする
         }
+    }
+
+    private function resolveSubject(?string $value, string $default): string
+    {
+        $subject = trim((string) $value);
+
+        return $subject !== '' ? $subject : $default;
     }
 
     /**

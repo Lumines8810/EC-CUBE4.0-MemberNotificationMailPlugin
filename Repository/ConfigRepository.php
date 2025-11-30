@@ -2,36 +2,33 @@
 
 namespace Plugin\CustomerChangeNotify\Repository;
 
-use Doctrine\Persistence\ManagerRegistry;
 use Eccube\Repository\AbstractRepository;
 use Plugin\CustomerChangeNotify\Entity\Config;
-
-// Doctrine ORM 2.10+ moves ManagerRegistry to Doctrine\Persistence. EC-CUBE 4.0.3
-// still ships Doctrine\Common\Persistence but a composer update can drop it,
-// causing a fatal "Class 'Doctrine\\Common\\Persistence\\ManagerRegistry' not
-// found" error when the repository is autoloaded. Provide a runtime alias to the
-// legacy namespace so both dependency stacks work.
-if (!interface_exists(ManagerRegistry::class) && interface_exists(\Doctrine\Common\Persistence\ManagerRegistry::class)) {
-    class_alias(\Doctrine\Common\Persistence\ManagerRegistry::class, ManagerRegistry::class);
-}
+use Symfony\Bridge\Doctrine\RegistryInterface;
 
 /**
  * ConfigRepository.
+ *
+ * EC-CUBE 4.0.3 exposes Doctrine's registry via Symfony\Bridge\Doctrine\RegistryInterface.
  */
 class ConfigRepository extends AbstractRepository
 {
     /**
      * ConfigRepository constructor.
      *
-     * @param ManagerRegistry $registry
+     * @param RegistryInterface $registry
      */
-    public function __construct(ManagerRegistry $registry)
+    public function __construct(RegistryInterface $registry)
     {
         parent::__construct($registry, Config::class);
     }
 
     /**
-     * 設定を取得する（存在しない場合は新規作成）.
+     * 設定を取得する（存在しない場合はデフォルト値を持つメモリ内オブジェクトを返す）.
+     *
+     * IMPORTANT: postFlush コールバック中に flush() を呼び出すと Segmentation fault が発生するため、
+     * このメソッドは DB に存在しない場合でも flush() を実行しません。
+     * Config レコードは PluginManager::install() で作成されます。
      *
      * @param int $id デフォルトは 1
      *
@@ -42,6 +39,8 @@ class ConfigRepository extends AbstractRepository
         $Config = $this->find($id);
 
         if (!$Config) {
+            // DB に存在しない場合は、デフォルト値を持つメモリ内オブジェクトを返す
+            // postFlush 中の flush() 呼び出しを回避するため、永続化しない
             $Config = new Config();
             // デフォルト値は Entity で設定されている
         }
